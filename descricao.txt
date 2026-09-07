@@ -1,0 +1,15 @@
+O trabalho consiste em 2 projetos, pode ser feito em qualquer linguagem. Lembre-se de adicionar um arquivo de documentação explicando como executar o seu projeto.
+
+Deverá ser implementado todo o compilador para atender a gramática dada. Deverá conter o analisador léxico, sintático e semântico, conforme Comp 1, porém agora para uma gramática mais complexa. Pode ser utilizado tanto o analisador descendente, quanto o descendente não recursivo, quanto o ascendente. Além disso deverá ser adicionado o tradutor para nossa linguagem de máquina hipotética, salvando em um arquivo de texto mesmo, ou outro formato, consistindo até aqui na parte 1 do projeto. Já na parte 2 deverá ser lido esse arquivo e os comandos executados conforme visto em sala (Slide e Video disponibilizado).
+
+Não poderá ser utilizado nenhuma biblioteca como o lex, ou semelhantes. Poderá ser utilizado IA, contudo deve colocar explicitamente que utilizou e qual utilizou. 
+
+1 - Deverá salvar em um arquivo de texto o código objeto gerado, a partir de um arquivo de texto com o código de entrada
+
+2 - Deverá ler o arquivo do código objeto e executar
+
+Obs: Serão todos individuais e os projetos serão apresentados individualmente no final do semestre.
+
+Qualquer dúvida pode entrar em contato por email ou discord.
+
+Está em anexo a linguagem e qual técnica cada uma deve utilizar. Verifiquem se a gramática está ok também.

@@ -1,0 +1,25 @@
+PROG          -> public class id {  public static void main ( String [ ] id ) {  <CMDS> } } 
+DC            -> <VAR> <MAIS_CMDS>
+VAR           -> <TIPO> <VARS>
+VARS          -> id<MAIS_VAR>
+MAIS_VAR      -> ,<VARS> | λ
+TIPO          -> double
+CMDS          -> <CMD><MAIS_CMDS> | <CMD_COND><CMDS> | <DC> | λ
+MAIS_CMDS     -> ;<CMDS>
+CMD_COND      -> if (  <CONDICAO> )  {<CMDS>} <PFALSA>
+                 | while (  <CONDICAO> )  {<CMDS>}
+CMD           -> System.out.println (<EXPRESSAO>) 
+                 | id <RESTO_IDENT> 
+PFALSA        -> else { <CMDS> } | λ
+RESTO_IDENT   -> = <EXP_IDENT>
+EXP_IDENT     -> <EXPRESSAO> | lerDouble()
+CONDICAO      -> <EXPRESSAO> <RELACAO> <EXPRESSAO>
+RELACAO       -> == | != | >= | <= | > | <
+EXPRESSAO     -> <TERMO> <OUTROS_TERMOS>
+TERMO         -> <OP_UN> <FATOR> <MAIS_FATORES>
+OP_UN         -> - | λ
+FATOR         -> id | numero_real | (<EXPRESSAO>)
+OUTROS_TERMOS -> <OP_AD> <TERMO> <OUTROS_TERMOS> | λ
+OP_AD         -> + | -
+MAIS_FATORES  -> <OP_MUL> <FATOR> <MAIS_FATORES> | λ
+OP_MUL        -> * | /
