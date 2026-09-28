@@ -12,10 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Analisador Lexico (Scanner) Puro para a linguagem Java Simplificada.
+ * Analisador Lexico (Lexer) Puro para a linguagem Java Simplificada.
  * Implementa um Automato Finito Deterministico (AFD) manual, sem uso de geradores ou bibliotecas externas.
  */
-public class Scanner {
+public class Lexer {
     private final String codigoFonte;
     private int inicio = 0;
     private int atual = 0;
@@ -41,14 +41,14 @@ public class Scanner {
         PALAVRAS_RESERVADAS.put("while", TokenTipo.WHILE);
     }
 
-    public Scanner(String codigoFonte) {
+    public Lexer(String codigoFonte) {
         this.codigoFonte = (codigoFonte != null) ? codigoFonte : "";
     }
 
     /**
-     * Cria um Scanner a partir de um arquivo de texto.
+     * Cria um Lexer a partir de um arquivo de texto.
      */
-    public static Scanner fromFile(String caminhoArquivo) throws IOException {
+    public static Lexer fromFile(String caminhoArquivo) throws IOException {
         File arquivo = new File(caminhoArquivo);
         if (!arquivo.exists()) {
             throw new IOException("Arquivo nao encontrado: " + caminhoArquivo);
@@ -62,7 +62,7 @@ public class Scanner {
                 sb.append(buffer, 0, lidos);
             }
         }
-        return new Scanner(sb.toString());
+        return new Lexer(sb.toString());
     }
 
     /**
@@ -113,7 +113,7 @@ public class Scanner {
     }
 
     /**
-     * Reinicia o scanner para o inicio do codigo fonte.
+     * Reinicia o lexer para o inicio do codigo fonte.
      */
     public void reiniciar() {
         this.inicio = 0;
