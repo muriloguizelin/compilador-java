@@ -1,0 +1,8 @@
+public class TesteErroSemanticoNaoDeclarada {
+    public static void main(String[] args) {
+        double a;
+        a = 10;
+        total = a + 5; // ERRO SEMANTICO: variavel 'total' nao foi declarada
+        System.out.println(total);
+    }
+}

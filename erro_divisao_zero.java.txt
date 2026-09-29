@@ -1,0 +1,8 @@
+public class TesteDivisaoZero {
+    public static void main(String[] args) {
+        double a, b;
+        a = 10;
+        b = a / 0; // Compila perfeitamente, mas quebra na Maquina Hipotetica por divisao por zero!
+        System.out.println(b);
+    }
+}

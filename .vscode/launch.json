@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Debug Compilador (correto.java.txt)",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "correto.java.txt"
+        },
+        {
+            "type": "java",
+            "name": "Debug Compilador com Depuração Detalhada (--debug)",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "correto.java.txt --debug"
+        },
+        {
+            "type": "java",
+            "name": "Debug Máquina Hipotética",
+            "request": "launch",
+            "mainClass": "compilador.maquina.MainMaquina",
+            "args": "codigo.objeto.txt"
+        }
+    ]
+}

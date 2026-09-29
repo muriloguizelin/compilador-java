@@ -1,0 +1,8 @@
+public class TesteErroSemanticoDuplicada {
+    public static void main(String[] args) {
+        double x;
+        x = 5;
+        double x; // ERRO SEMANTICO: variavel 'x' ja declarada anteriormente na linha 3
+        System.out.println(x);
+    }
+}

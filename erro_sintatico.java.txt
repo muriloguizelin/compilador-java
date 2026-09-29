@@ -1,0 +1,10 @@
+public class TesteErroSintatico {
+    public static void main(String[] args) {
+        double a, b;
+        a = 10;
+        if a > 5 { // ERRO SINTATICO: a gramatica exige parenteses obrigatorios em if ( CONDICAO )
+            b = 20;
+        }
+        System.out.println(b);
+    }
+}

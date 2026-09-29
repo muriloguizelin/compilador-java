@@ -1,4 +1,4 @@
-# Especificação e Documentação: Analisador Léxico (Scanner)
+# Especificação e Documentação: Analisador Léxico (Lexer)
 
 > **Módulo:** Compilador Java Simplificado (`lalg-java`) — Parte 1  
 > **Técnica:** Autômato Finito Determinístico (AFD) Manual Puro (sem Lex/JFlex)  
@@ -8,7 +8,7 @@
 
 ## 1. Visão Geral
 
-O **Analisador Léxico (Scanner)** é o primeiro estágio do compilador. Sua função principal é:
+O **Analisador Léxico (Lexer)** é o primeiro estágio do compilador. Sua função principal é:
 1. Ler o fluxo bruto de caracteres do código fonte (arquivo `.txt` ou string UTF-8).
 2. Ignorar elementos irrelevantes para a sintaxe (espaços em branco, tabulações, quebras de linha e comentários).
 3. Agrupar os caracteres válidos em unidades léxicas atômicas denominadas **Tokens**, classificando-os com base no vocabulário terminal da gramática formal.
@@ -19,7 +19,7 @@ O **Analisador Léxico (Scanner)** é o primeiro estágio do compilador. Sua fun
                │
                ▼
    +───────────────────────+
-   |    Scanner (AFD)      | <── Lê caractere a caractere com buffer
+   |     Lexer (AFD)       | <── Lê caractere a caractere com buffer
    +───────────────────────+
                │
                ▼
@@ -78,7 +78,7 @@ O analisador léxico implementa o mapeamento estrito para os **33 terminais form
 
 ## 3. O Autômato Finito Determinístico (AFD)
 
-O Scanner opera como uma máquina de estados finitos que avança caractere a caractere com um cursor (`atual`) e um marcador de início de lexema (`inicio`).
+O Lexer opera como uma máquina de estados finitos que avança caractere a caractere com um cursor (`atual`) e um marcador de início de lexema (`inicio`).
 
 ```
                 +-------------------+
@@ -140,7 +140,7 @@ O pacote `compilador.lexico` contém os seguintes arquivos:
 
 - [TokenTipo.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/TokenTipo.java): Enum com todas as categorias sintáticas e representações formais.
 - [Token.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/Token.java): Classe de dados imutável armazenando `tipo`, `lexema`, `literal`, `linha` e `coluna`.
-- [Scanner.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/Scanner.java): Motor do AFD com suporte a `proximoToken()` e lookahead de 1 token (`espiarToken()`).
+- [Lexer.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/Lexer.java): Motor do AFD com suporte a `proximoToken()` e lookahead de 1 token (`espiarToken()`).
 - [LexicalException.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/LexicalException.java): Exceção que carrega as coordenadas de erro léxico.
 
 ---

@@ -1,0 +1,7 @@
+public class TesteErroLexico {
+    public static void main(String[] args) {
+        double cont;
+        cont = 10 @ 5; // ERRO LEXICO: caractere '@' nao existe na gramatica lalg-java
+        System.out.println(cont);
+    }
+}
