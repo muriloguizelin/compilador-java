@@ -95,7 +95,7 @@ public class MaquinaHipotetica {
                 case "MULT": M[s - 1] = M[s - 1] * M[s]; s--; break;
                 case "DIVI":
                     if (M[s] == 0.0) {
-                        throw new ArithmeticException("Erro em tempo de execução: Divisão por zero na linha " + linhaExec);
+                        throw new ArithmeticException("Erro em tempo de execucao: Divisao por zero na linha " + linhaExec);
                     }
                     M[s - 1] = M[s - 1] / M[s];
                     s--;
@@ -125,7 +125,7 @@ public class MaquinaHipotetica {
                     break;
                 case "PARA": rodando = false; break;
                 default:
-                    throw new UnsupportedOperationException("Instrução desconhecida: " + inst.opcode);
+                    throw new UnsupportedOperationException("Instrucao desconhecida: " + inst.opcode);
             }
         }
     }

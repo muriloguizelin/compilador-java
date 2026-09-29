@@ -30,7 +30,7 @@ public class AnalisadorSemantico {
     public static class SemanticException extends RuntimeException {
         public final int linha, coluna;
         public SemanticException(String msg, int linha, int coluna) {
-            super(String.format("Erro Semântico na linha %d, coluna %d: %s", linha, coluna, msg));
+            super(String.format("Erro Semantico na linha %d, coluna %d: %s", linha, coluna, msg));
             this.linha = linha;
             this.coluna = coluna;
         }
@@ -43,7 +43,7 @@ public class AnalisadorSemantico {
             if (variaveis.containsKey(nome)) {
                 Simbolo anterior = variaveis.get(nome);
                 throw new SemanticException(
-                        String.format("Variável '%s' já declarada anteriormente na linha %d", nome, anterior.linha),
+                        String.format("Variavel '%s' ja declarada anteriormente na linha %d", nome, anterior.linha),
                         linha, coluna);
             }
             Simbolo s = new Simbolo(nome, tipo, variaveis.size(), linha, coluna);
@@ -55,7 +55,7 @@ public class AnalisadorSemantico {
             Simbolo s = variaveis.get(nome);
             if (s == null) {
                 throw new SemanticException(
-                        String.format("Variável '%s' utilizada sem declaração prévia", nome),
+                        String.format("Variavel '%s' utilizada sem declaracao previa", nome),
                         linha, coluna);
             }
             return s;

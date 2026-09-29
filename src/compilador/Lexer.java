@@ -50,7 +50,7 @@ public class Lexer {
         public final int coluna;
 
         public LexicalException(String msg, int linha, int coluna) {
-            super(String.format("Erro Léxico na linha %d, coluna %d: %s", linha, coluna, msg));
+            super(String.format("Erro Lexico na linha %d, coluna %d: %s", linha, coluna, msg));
             this.linha = linha;
             this.coluna = coluna;
         }
@@ -174,7 +174,7 @@ public class Lexer {
                 if (match('=')) return new Token(Tipo.GE, ">=", linTok, colTok);
                 return new Token(Tipo.GT, ">", linTok, colTok);
             default:
-                throw new LexicalException("Caractere inválido: '" + c + "'", linTok, colTok);
+                throw new LexicalException("Caractere invalido: '" + c + "'", linTok, colTok);
         }
     }
 

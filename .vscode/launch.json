@@ -6,56 +6,64 @@
             "name": "Compilador (correto.java.txt)",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "exemplos/correto.java.txt"
+            "args": "exemplos/correto.java.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Compilador com Trace (--debug)",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "exemplos/correto.java.txt --debug"
+            "args": "exemplos/correto.java.txt --debug",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Compilador - Teste Erro Léxico",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "exemplos/erro_lexico.java.txt"
+            "args": "exemplos/erro_lexico.java.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Compilador - Teste Erro Sintático",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "exemplos/erro_sintatico.java.txt"
+            "args": "exemplos/erro_sintatico.java.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Compilador - Teste Semântico (Não Declarada)",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "exemplos/erro_semantico_naodeclarada.java.txt"
+            "args": "exemplos/erro_semantico_naodeclarada.java.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Compilador - Teste Semântico (Duplicada)",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "exemplos/erro_semantico_duplicada.java.txt"
+            "args": "exemplos/erro_semantico_duplicada.java.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Máquina Hipotética (codigo.objeto.txt)",
             "request": "launch",
             "mainClass": "compilador.maquina.MainMaquina",
-            "args": "codigo.objeto.txt"
+            "args": "codigo.objeto.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         },
         {
             "type": "java",
             "name": "Máquina Hipotética com Trace (--trace)",
             "request": "launch",
             "mainClass": "compilador.maquina.MainMaquina",
-            "args": "codigo.objeto.txt --trace"
+            "args": "codigo.objeto.txt --trace",
+            "vmArgs": "-Dfile.encoding=UTF-8"
         }
     ]
 }

@@ -33,7 +33,7 @@ public class ParserSLR {
     public static class SyntacticException extends RuntimeException {
         public final int linha, coluna;
         public SyntacticException(String msg, int linha, int coluna) {
-            super(String.format("Erro Sintático na linha %d, coluna %d: %s", linha, coluna, msg));
+            super(String.format("Erro Sintatico na linha %d, coluna %d: %s", linha, coluna, msg));
             this.linha = linha;
             this.coluna = coluna;
         }
@@ -321,7 +321,7 @@ public class ParserSLR {
             if (acao == null) acao = Acao.error();
 
             if (modoDebug) {
-                System.out.printf("Passo %-4d | Estado %-3d | Token %-15s | Ação: %s%n", passos, s, a.lexema, acao.tipo);
+                System.out.printf("Passo %-4d | Estado %-3d | Token %-15s | Acao: %s%n", passos, s, a.lexema, acao.tipo);
             }
 
             switch (acao.tipo) {
@@ -346,7 +346,7 @@ public class ParserSLR {
                     int topoEstado = (Integer) pilha.peek();
                     Integer prox = tabelaGoto.getOrDefault(topoEstado, Collections.emptyMap()).get(r.lhs);
                     if (prox == null) {
-                        throw new SyntacticException("Desvio (GOTO) indefinido para não-terminal " + r.lhs, a.linha, a.coluna);
+                        throw new SyntacticException("Desvio (GOTO) indefinido para nao-terminal " + r.lhs, a.linha, a.coluna);
                     }
                     pilha.push(no);
                     pilha.push(prox);
