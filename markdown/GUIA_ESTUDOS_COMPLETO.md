@@ -377,19 +377,59 @@ Aqui estão as 7 perguntas exatas que o professor/banca costuma fazer e como voc
 
 ## Como Executar Tudo no Terminal:
 
+### 1. Compilação do Projeto Java:
 ```powershell
-# 1. Compilar todo o projeto Java
-javac -source 8 -target 8 -d bin (Get-ChildItem -Path src -Recurse -Filter *.java).FullName
+javac -d bin -sourcepath src src/compilador/MainCompilador.java src/compilador/maquina/MainMaquina.java
+```
 
-# 2. Executar a compilação completa (Parte 1: Léxico -> Sintático -> Semântico -> Código Objeto)
-java -cp bin compilador.MainCompilador correto.java.txt
+---
 
-# 3. Executar o compilador com trace detalhado da pilha SLR(1)
-java -cp bin compilador.MainCompilador correto.java.txt --debug
+### 2. Executando o Caso de Sucesso:
+```powershell
+# Compilação completa (Léxico -> Sintático SLR(1) -> Semântico -> Código Objeto)
+java -cp bin compilador.MainCompilador exemplos/correto.java.txt
 
-# 4. Executar o código objeto gerado na Máquina Hipotética (Parte 2)
+# Execução na Máquina Hipotética (simulação da CPU virtual)
 java -cp bin compilador.maquina.MainMaquina codigo.objeto.txt
 
-# 5. Executar a Máquina Hipotética em modo trace (mostrando a CPU e a pilha ciclo a ciclo)
+# Execução com modo Trace passo a passo da CPU
 java -cp bin compilador.maquina.MainMaquina codigo.objeto.txt --trace
 ```
+
+---
+
+### 3. Executando os Casos de Erro (Testes Negativos):
+
+#### A) Erro Léxico (Caractere inválido `@`):
+```powershell
+java -cp bin compilador.MainCompilador exemplos/erro_lexico.java.txt
+```
+> **Resultado esperado:** Interrompe na Fase 1 (Léxico) acusando `Erro Léxico na linha 4, coluna 19: Caractere inválido: '@'`.
+
+#### B) Erro Sintático (Falta de parênteses em `if a > 5`):
+```powershell
+java -cp bin compilador.MainCompilador exemplos/erro_sintatico.java.txt
+```
+> **Resultado esperado:** Passa pelo Léxico, mas a Fase 2 (Sintático SLR) acusa `Erro Sintático na linha 5, coluna 12: Token inesperado 'a' (ID)`.
+
+#### C) Erro Semântico 1 (Variável `total` utilizada sem ser declarada):
+```powershell
+java -cp bin compilador.MainCompilador exemplos/erro_semantico_naodeclarada.java.txt
+```
+> **Resultado esperado:** Passa por Léxico e Sintático, mas a Fase 3 (Semântico) acusa `Erro Semântico na linha 5, coluna 9: Variável 'total' utilizada sem declaração prévia`.
+
+#### D) Erro Semântico 2 (Variável `x` redeclarada no mesmo bloco):
+```powershell
+java -cp bin compilador.MainCompilador exemplos/erro_semantico_duplicada.java.txt
+```
+> **Resultado esperado:** A Fase 3 (Semântico) acusa `Erro Semântico na linha 5, coluna 16: Variável 'x' já declarada anteriormente na linha 3`.
+
+#### E) Erro em Tempo de Execução (Divisão por zero `a / 0`):
+```powershell
+# Passo 1: Compilar o arquivo (o compilador aceita porque a sintaxe e tipos estão certos)
+java -cp bin compilador.MainCompilador exemplos/erro_divisao_zero.java.txt
+
+# Passo 2: Executar na Máquina Hipotética (a CPU virtual interrompe na instrução DIVI)
+java -cp bin compilador.maquina.MainMaquina codigo.objeto.txt
+```
+> **Resultado esperado:** O compilador gera as 12 instruções com sucesso, mas a Máquina Hipotética acusa `Erro em tempo de execução: Divisão por zero na linha 6` e finaliza a execução.

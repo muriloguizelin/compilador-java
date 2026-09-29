@@ -3,24 +3,59 @@
     "configurations": [
         {
             "type": "java",
-            "name": "Debug Compilador (correto.java.txt)",
+            "name": "Compilador (correto.java.txt)",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "correto.java.txt"
+            "args": "exemplos/correto.java.txt"
         },
         {
             "type": "java",
-            "name": "Debug Compilador com Depuração Detalhada (--debug)",
+            "name": "Compilador com Trace (--debug)",
             "request": "launch",
             "mainClass": "compilador.MainCompilador",
-            "args": "correto.java.txt --debug"
+            "args": "exemplos/correto.java.txt --debug"
         },
         {
             "type": "java",
-            "name": "Debug Máquina Hipotética",
+            "name": "Compilador - Teste Erro Léxico",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "exemplos/erro_lexico.java.txt"
+        },
+        {
+            "type": "java",
+            "name": "Compilador - Teste Erro Sintático",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "exemplos/erro_sintatico.java.txt"
+        },
+        {
+            "type": "java",
+            "name": "Compilador - Teste Semântico (Não Declarada)",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "exemplos/erro_semantico_naodeclarada.java.txt"
+        },
+        {
+            "type": "java",
+            "name": "Compilador - Teste Semântico (Duplicada)",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "exemplos/erro_semantico_duplicada.java.txt"
+        },
+        {
+            "type": "java",
+            "name": "Máquina Hipotética (codigo.objeto.txt)",
             "request": "launch",
             "mainClass": "compilador.maquina.MainMaquina",
             "args": "codigo.objeto.txt"
+        },
+        {
+            "type": "java",
+            "name": "Máquina Hipotética com Trace (--trace)",
+            "request": "launch",
+            "mainClass": "compilador.maquina.MainMaquina",
+            "args": "codigo.objeto.txt --trace"
         }
     ]
 }

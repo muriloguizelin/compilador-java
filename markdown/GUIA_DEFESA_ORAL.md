@@ -140,7 +140,7 @@ A Máquina Hipotética funciona com dois ponteiros principais:
 
 ## 3. Rastreamento Linha a Linha: Do Código Java ao Código Objeto
 
-Veja como o compilador traduz [correto.java.txt](file:///c:/Users/Muril/compilador-java/correto.java.txt) para instruções da Máquina Hipotética:
+Veja como o compilador traduz [correto.java.txt](file:///c:/Users/Muril/compilador-java/exemplos/correto.java.txt) para instruções da Máquina Hipotética:
 
 ### Trecho 1: Declarações
 ```java
