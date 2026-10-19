@@ -9,7 +9,7 @@ import java.util.List;
  */
 public class MainCompilador {
     public static void main(String[] args) {
-        String caminhoFonte = "correto.java.txt";
+        String caminhoFonte = new File("correto.java.txt").exists() ? "correto.java.txt" : "exemplos/correto.java.txt";
         String caminhoObjeto = "codigo.objeto.txt";
         boolean modoDebug = false;
 
