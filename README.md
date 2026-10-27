@@ -46,10 +46,10 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
 
 ### 2. Analisador Sintático Ascendente SLR(1) (`ParserSLR.java`)
 - **Implementação:** Analisador sintático ascendente (Shift-Reduce) operando com pilha de estados e tabela SLR(1).
-- **Decisão sobre as Tabelas ACTION e GOTO:**
-  - A gramática do trabalho possui 23 não-terminais e gera 95 estados canônicos LR(0). 
-  - Em vez de preencher manualmente uma matriz estática no código (processo repetitivo com milhares de células, altamente suscetível a erro humano de digitação) ou depender de ferramentas externas de compilação, o construtor da classe `ParserSLR` calcula a tabela dinamicamente em memória logo na inicialização.
-  - Ele executa o cálculo dos conjuntos anuláveis ($\epsilon$), conjuntos `FIRST` e `FOLLOW` por iteração de ponto fixo, constrói a coleção canônica de itens $LR(0)$ via funções de `fecho` e `desvio`, e preenche os mapas de `ACTION` e `GOTO`. O processo completo leva menos de 10 milissegundos.
+- **Decisão sobre as Tabelas ACTION, GOTO e Conjuntos FIRST/FOLLOW:**
+  - A gramática do trabalho possui 23 não-terminais e 95 estados canônicos LR(0).
+  - Como a gramática da linguagem é fixa e imutável (`lalg-java.txt`), os conjuntos `FIRST`, `FOLLOW` e as tabelas de transição `ACTION` e `GOTO` foram calculados e pré-setados diretamente na estrutura do `ParserSLR.java`.
+  - Essa abordagem elimina qualquer risco de inconsistência de algoritmos de fecho/desvio em tempo de execução, garantindo inicialização instantânea (0 ms), determinismo estrito e sem conflitos Shift/Reduce ou Reduce/Reduce.
 - **Ausência de Conflitos:** A gramática fornecida (`lalg-java.txt`) foi formalmente validada e pertence estritamente à classe SLR(1), apresentando 0 conflitos Shift/Reduce e 0 conflitos Reduce/Reduce. O uso explícito de blocos delimitados por chaves `{ ... }` em comandos `if` e `else` elimina o problema clássico de *dangling else*.
 
 ### 3. Analisador Semântico (`AnalisadorSemantico.java`)
@@ -96,6 +96,7 @@ compilador-java/
 └── src/compilador/
     ├── Lexer.java
     ├── ParserSLR.java
+    ├── TabelaSLR.java
     ├── AnalisadorSemantico.java
     ├── TradutorCodigo.java
     ├── MainCompilador.java
