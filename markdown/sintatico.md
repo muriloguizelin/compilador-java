@@ -167,17 +167,19 @@ Erro Sintatico [Linha 4, Coluna 9]: Token inesperado 'a' (tipo: ID). (Estado SLR
 
 ---
 
-## 6. Estrutura de Classes do Pacote `compilador.sintatico`
+## 6. Estrutura de Classes do Analisador Sintático
 
-- [NaoTerminal.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/NaoTerminal.java): Enum com todos os não-terminais formais.
-- [SimboloGramatical.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/SimboloGramatical.java): Encapsula símbolos terminais (`TokenTipo`) e não-terminais (`NaoTerminal`).
-- [Producao.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/Producao.java): Regra gramatical $A \rightarrow \beta$.
-- [ItemLR0.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/ItemLR0.java): Itens canônicos $[A \rightarrow \alpha \cdot \beta]$.
-- [AcaoTipo.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/AcaoTipo.java) e [Acao.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/Acao.java): Encapsulam as transições da tabela SLR(1).
-- [Gramatica.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/Gramatica.java): Motor formal de cálculo de `FIRST`, `FOLLOW`, autômato LR(0) e montagem das tabelas `ACTION` e `GOTO`.
-- [TabelaSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/TabelaSLR.java): Matrizes com busca $O(1)$ e consulta de tokens esperados.
-- [ParserSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/ParserSLR.java): Motor de execução com a pilha de análise e gerador de trace.
-- [SyntacticException.java](file:///c:/Users/Muril/compilador-java/src/compilador/sintatico/SyntacticException.java): Exceção detalhada com coordenadas e tokens esperados.
+O analisador sintático é dividido de forma enxuta e modular em 2 arquivos no pacote `compilador`:
+
+- [ParserSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/ParserSLR.java):
+  - `ParserSLR.NaoTerminal`: Enum com os 24 não-terminais da gramática.
+  - `ParserSLR.NoSintatico`: Nó da Árvore Sintática Concreta (CST), podendo ser folha (`token != null`) ou nó interno (`nt != null` e lista `filhos`).
+  - `ParserSLR.SyntacticException`: Exceção detalhada com linha, coluna, token inesperado e lista de tokens esperados.
+  - `ParserSLR.analisar(tokens)`: Motor de execução da pilha alternada Shift-Reduce.
+- [TabelaSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java):
+  - `TabelaSLR.Regra`: Representa uma produção $A \rightarrow \beta$ com `id`, `lhs` e array `rhs`.
+  - `TabelaSLR.Acao` e `TabelaSLR.AcaoTipo`: Representam as transições `SHIFT`, `REDUCE`, `ACCEPT` e `ERROR`.
+  - `definirGramatica()`, `carregarFirstPredefinido()`, `carregarFollowPredefinido()`, `carregarActionPredefinido()` e `carregarGotoPredefinido()`: Carregam a gramática formal e os 95 estados canônicos, aplicando `FOLLOW(lhs)` nas reduções via `reduce(estado, regraId)`.
 
 ---
 
@@ -185,8 +187,8 @@ Erro Sintatico [Linha 4, Coluna 9]: Token inesperado 'a' (tipo: ID). (Estado SLR
 
 ```powershell
 # Execução normal com relatório sintetizado
-java -cp bin compilador.MainCompilador correto.java.txt
+java -cp bin compilador.MainCompilador exemplos/correto.java.txt
 
-# Execução com depuração (trace completo da pilha passo a passo)
-java -cp bin compilador.MainCompilador correto.java.txt --debug
+# Execução com depuração (exibe FIRST/FOLLOW e trace completo da pilha passo a passo)
+java -cp bin compilador.MainCompilador exemplos/correto.java.txt --debug
 ```

@@ -43,26 +43,25 @@ As principais responsabilidades do analisador semântico no compilador são:
 
 A **Tabela de Símbolos** é a estrutura de dados central que persiste durante toda a compilação, acumulando os metadados dos identificadores declarados no programa.
 
-### 2.1 Atributos de um Símbolo (`Simbolo.java`)
+### 2.1 Atributos de um Símbolo (`AnalisadorSemantico.Simbolo`)
 
 Cada entrada na tabela armazena:
 
 | Atributo | Tipo Java | Descrição | Exemplo em `correto.java.txt` |
 | :--- | :--- | :--- | :--- |
 | `nome` | `String` | O lexema do identificador | `"cont"`, `"a"`, `"b"`, `"c"` |
-| `tipo` | `TipoDado` | Tipo do dado associado | `TipoDado.DOUBLE` |
+| `tipo` | `String` | Tipo do dado associado | `"double"` |
 | `endereco` | `int` | Índice da posição de memória na Máquina Virtual | `0`, `1`, `2`, `3` |
 | `linha` | `int` | Linha do código fonte onde foi declarado | `3` (para `cont`), `4` (para `a,b,c`) |
 | `coluna` | `int` | Coluna onde foi declarado | `16` |
-| `inicializado` | `boolean` | Flag indicando se recebeu valor via atribuição | `true` após `cont = 10;` |
 
-### 2.2 Estrutura da Tabela (`TabelaSimbolos.java`)
+### 2.2 Estrutura da Tabela (`AnalisadorSemantico.TabelaSimbolos`)
 
-A tabela é implementada internamente sobre um `Map<String, Simbolo>` com inserção sequencial:
-- `inserir(nome, tipo, linha, coluna)`: Insere nova variável. Lança `SemanticException` caso o nome já exista.
-- `buscar(nome)`: Retorna o símbolo associado. Retorna `null` se não encontrado.
+A tabela é implementada internamente sobre um `LinkedHashMap<String, Simbolo>` com inserção sequencial:
+- `inserir(nome, tipo, linha, coluna)`: Insere nova variável com endereço igual a `variaveis.size()`. Lança `SemanticException` caso o nome já exista.
 - `verificarDeclarada(nome, linha, coluna)`: Retorna o símbolo ou dispara erro semântico de variável não declarada.
-- `obterTotalVariaveis()`: Retorna a quantidade total de variáveis alocadas (necessário para a instrução `ALME`).
+- `obterEndereco(nome)`: Retorna o endereço de memória ($0 \dots m-1$) usado pelo `TradutorCodigo` para emitir `CRVL` e `ARMZ`.
+- `getTotalVariaveis()`: Retorna a quantidade total de variáveis alocadas (necessário para as instruções `ALME` e `DESM`).
 
 ---
 
@@ -130,18 +129,15 @@ Mapeamento resultante na Tabela de Símbolos:
 
 ---
 
-## 5. Acoplamento com o Parser Ascendente SLR(1)
+## 5. Travessia da Árvore Sintática Concreta (CST) em Pré-Ordem
 
-No parsing ascendente, as ações semânticas são disparadas **no momento exato em que uma regra de produção é reduzida (Reduce)**:
+Após o `ParserSLR` construir a árvore sintática (`NoSintatico`), o `AnalisadorSemantico` percorre a árvore em **pré-ordem** (`percorrer(NoSintatico no)`), garantindo que toda variável seja declarada **antes** de ser utilizada:
 
-| Produção Reduzida | Ação Semântica Executada |
+| Nó Visitado na CST | Ação Semântica Executada |
 | :--- | :--- |
-| `TIPO -> double` | Define o tipo corrente de declaração como `DOUBLE`. |
-| `VARS -> id MAIS_VAR` | Insere o identificador `id` na Tabela de Símbolos associando o próximo endereço livre ($0, 1, \dots$). Verifica duplicidade. |
-| `CMD -> id RESTO_IDENT` | Verifica se `id` está declarado na Tabela de Símbolos. Recupera seu endereço $n$ para gerar a instrução `ARMZ n`. |
-| `FATOR -> id` | Verifica se `id` está declarado na Tabela de Símbolos. Recupera seu endereço $n$ para gerar a instrução de leitura `CRVL n`. |
-| `EXP_IDENT -> lerDouble()` | Sinaliza a emissão da instrução `LEIT`. |
-| `CMD -> System.out.println ( EXPRESSAO )` | Sinaliza a emissão da instrução `IMPR`. |
+| `VAR -> TIPO VARS` | Percorre recursivamente `VARS` e `MAIS_VAR`, inserindo cada `id` na Tabela de Símbolos com o próximo endereço livre ($0, 1, \dots$) e verificando duplicidade. |
+| `CMD -> id RESTO_IDENT` | Verifica via `tabela.verificarDeclarada(...)` se o `id` à esquerda da atribuição já foi declarado. |
+| `FATOR -> id` | Verifica via `tabela.verificarDeclarada(...)` se o `id` lido na expressão/condição já foi declarado. |
 
 ---
 

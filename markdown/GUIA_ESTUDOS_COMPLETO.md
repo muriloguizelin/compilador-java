@@ -21,40 +21,63 @@
 
 ---
 
-## MÓDULO 0: Respostas às Suas Dúvidas Anotadas no Código
+## MÓDULO 0: Explicação das Linhas-Chave do Código (Onde o Professor Pode Perguntar)
 
-Aqui estão as explicações diretas e detalhadas sobre as perguntas que você colocou nos comentários:
+Aqui estão as explicações diretas e detalhadas sobre as linhas do código que o professor pode apontar na defesa oral:
 
-### 1. "Por que `InputStreamReader` e `FileInputStream`?"
+### 1. "O que faz `Files.readString(Path.of(caminho), StandardCharsets.UTF_8)` no `Lexer.java`?"
+- Lê todo o conteúdo do arquivo-fonte de uma só vez para uma `String` na memória RAM.
+- **`StandardCharsets.UTF_8`**: Força explicitamente a codificação UTF-8 para evitar problemas de acentuação ou quebras de linha entre Windows, Linux e Mac.
+
+### 2. "Como o Lexer reconhece `System.out.println` e `lerDouble()`?"
 ```java
-new BufferedReader(new InputStreamReader(new FileInputStream(arquivo), StandardCharsets.UTF_8))
+if ("System".equals(lexema) && fonte.startsWith(".out.println", atual)) {
+    for (int i = 0; i < 12; i++) avancar(); // consome ".out.println" (12 caracteres)
+    return new Token(Tipo.PRINT, "System.out.println", linTok, colTok);
+}
+if ("lerDouble".equals(lexema) && fonte.startsWith("()", atual)) {
+    avancar(); // consome '('
+    avancar(); // consome ')'
+    return new Token(Tipo.LER_DOUBLE, "lerDouble()", linTok, colTok);
+}
 ```
-- **`FileInputStream`**: O sistema operacional armazena arquivos como uma sequência pura de **bytes (0s e 1s)**. O `FileInputStream` abre o arquivo no disco rígido e lê esses bytes brutos.
-- **`InputStreamReader`**: Um byte sozinho não é uma letra. O `InputStreamReader` atua como uma **ponte de tradução**: ele pega os bytes brutos vindos do `FileInputStream` e os converte em caracteres Unicode legíveis (`char`).
-- **`StandardCharsets.UTF_8`**: Força explicitamente a codificação UTF-8. Se não colocássemos isso, o Java usaria o charset padrão do Windows (`Windows-1252`), que corrompe acentos e quebras de linha caso o código seja rodado no Linux ou Mac.
-- **`BufferedReader`**: Acessar o disco rígido caractere por caractere seria **extremamente lento**. O `BufferedReader` carrega grandes blocos de texto para a memória RAM de uma vez só, permitindo leitura ultrarrápida.
+- Na gramática `lalg-java.txt`, `System.out.println` e `lerDouble()` são **terminais únicos** (a linguagem não tem orientação a objetos geral nem operador `.`).
+- Por isso, quando o `Lexer` lê a palavra `"System"`, ele verifica se os próximos 12 caracteres são `".out.println"`. Se forem, avança os 12 caracteres e retorna o token `PRINT`.
+- Da mesma forma, ao ler `"lerDouble"`, verifica se os próximos 2 caracteres são `"()"`, avança 2 vezes e retorna `LER_DOUBLE`.
 
-### 2. "O que é o buffer `char[] buffer = new char[4096]` e por que 4096?"
-- Um **buffer** é uma "gaveta temporária" na memória RAM. Em vez de ler 1 caractere por vez do disco, lemos 4096 caracteres de uma só vez para essa gaveta e depois repassamos para a string final.
-- **Por que exatamente 4096?** Porque 4096 bytes (4 KB) é o tamanho exato de um **bloco físico de alocação de disco** nos sistemas de arquivos modernos (NTFS no Windows, ext4 no Linux). Ler em blocos de 4096 caracteres casa perfeitamente com a controladora do hardware, resultando na velocidade máxima possível de leitura.
-
-### 3. "Por que chamar `reiniciar()` dentro de `reset()` se `reset()` só existe para isso?"
-- Trata-se de um padrão de **Design de API (Alias / Sinônimo)**:
-  - `reiniciar()` é o nome em português claro para a sua apresentação na faculdade.
-  - `reset()` é o nome clássico padronizado na literatura de compiladores e bibliotecas Java.
-  - Ter `reset()` chamando `reiniciar()` garante que, se você ou algum teste chamar `lexer.reset()` ou `lexer.reiniciar()`, ambos funcionam perfeitamente sem duplicar o código interno.
-
-### 4. "Por que pular espaços e comentários (`pularEspacosEComentarios()`)?"
-- Espaços (`' '`), tabulações (`\t`), quebras de linha (`\n`) e comentários (`//` ou `/* ... */`) são criados exclusivamente para ajudar o **programador humano** a ler e organizar o código.
-- Para a sintaxe e a semântica de uma linguagem de programação, um comentário não gera nenhuma instrução de máquina. Portanto, o compilador descarta esses caracteres invisíveis antes de tentar reconhecer o próximo token útil.
-
-### 5. "O que faz o método `combinar(char esperado)`?"
+### 3. "O que faz o método `match(char esperado)` no `Lexer.java`?"
 - É o método de **Lookahead Condicional de 1 Caractere**:
-  - Ele olha o próximo caractere sem avançar o cursor imediatamente.
-  - **Exemplo com `=` e `==`:** Quando o scanner lê um caractere `'='`, ele não sabe ainda se é uma atribuição `=` ou uma igualdade `==`. Ele chama `combinar('=')`:
-    - Se o próximo for de fato `'='`, ele consome o caractere e emite `TokenTipo.EQ` (`==`).
-    - Se o próximo for um número ou identificador (ex: `= 10`), o método retorna `false` sem avançar, e o scanner emite `TokenTipo.ATRIB` (`=`).
-  - O mesmo vale para `<` vs `<=`, `>` vs `>=`, e `!` vs `!=`.
+  - Ele olha o próximo caractere da string `fonte` sem avançar caso não seja o esperado.
+  - **Exemplo com `=` e `==`:** Quando o scanner lê `'='`, ele ainda não sabe se é atribuição (`=`) ou comparação de igualdade (`==`). Ele chama `match('=')`:
+    - Se o próximo caractere for `'='`, ele consome e retorna `Tipo.EQ` (`==`).
+    - Se não for (ex: `= 10`), retorna `false` sem consumir o espaço/número e emite `Tipo.ATRIB` (`=`).
+  - O mesmo vale para `!=`, `<=` e `>=`.
+
+### 4. "O que faz o método `reduce(int st, int regraId)` em `TabelaSLR.java`?"
+```java
+private void reduce(int st, int regraId) {
+    Regra r = regras.get(regraId);
+    for (Lexer.Tipo tokenFollow : follow.get(r.lhs)) {
+        tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(tokenFollow, Acao.reduce(r));
+    }
+}
+```
+- Esta linha é a **definição exata de um parser SLR(1)**:
+  - Quando um estado `st` completa uma regra $A \rightarrow \beta$ (`r`), o parser SLR(1) não reduz para qualquer token; ele só aplica `REDUCE` se o próximo token da entrada pertencer ao conjunto `FOLLOW(A)` (`follow.get(r.lhs)`).
+  - O laço percorre todos os tokens do `FOLLOW` do não-terminal à esquerda da regra e registra `Acao.reduce(r)` na tabela `ACTION`.
+
+### 5. "Por que em `ParserSLR.java` usamos `no.filhos.add(0, (NoSintatico) pilha.pop())`?"
+- Porque a pilha funciona em ordem **LIFO** (o último elemento empilhado é o primeiro a sair).
+- Quando reduzimos uma regra como `CONDICAO -> EXPRESSAO RELACAO EXPRESSAO`, desempilhamos da direita para a esquerda. Inserindo sempre no índice `0` da lista `filhos`, os filhos ficam ordenados corretamente da esquerda para a direita (`filho(0)`, `filho(1)`, `filho(2)`).
+
+### 6. "Por que em `TradutorCodigo.java` pegamos `raiz.getFilho(15)`?"
+- Porque a regra 1 da gramática é:
+  `PROG -> public(0) class(1) id(2) {(3) public(4) static(5) void(6) main(7) ((8) String(9) [(10) ](11) id(12) )(13) {(14) <CMDS>(15) }(16) }(17)`
+- Contando a partir do zero, o bloco `<CMDS>` do `main` é exatamente o filho de índice `15` do nó `PROG`.
+
+### 7. "Por que usamos `if (arg == arg.longValue())` no `toString()` da instrução?"
+- Porque na Máquina Hipotética os argumentos são armazenados como `Double` (para aceitar tanto constantes reais como `3.14` quanto endereços inteiros como `0`, `1`, `32`).
+- Se o valor não possui casas decimais (ex: `4.0 == 4`), `arg.longValue()` formata como inteiro (`ALME 4`, `DSVF 32`) em vez de `ALME 4.0`. Se tiver casas decimais (`3.14`), imprime `CRCT 3.14`.
 
 ---
 

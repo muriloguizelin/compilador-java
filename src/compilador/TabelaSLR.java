@@ -4,7 +4,7 @@ import java.util.*;
 
 /**
  * Tabela de Transicao SLR(1) (ACTION e GOTO) e definicoes da Gramatica.
- * Contem as regras, os conjuntos FIRST/FOLLOW e as acoes pre-setadas.
+ * Contem as 44 regras de producao, os conjuntos FIRST/FOLLOW e os 95 estados LR(0).
  */
 public class TabelaSLR {
 
@@ -13,7 +13,9 @@ public class TabelaSLR {
         public final ParserSLR.NaoTerminal lhs;
         public final Object[] rhs;
         public Regra(int id, ParserSLR.NaoTerminal lhs, Object... rhs) {
-            this.id = id; this.lhs = lhs; this.rhs = rhs;
+            this.id = id;
+            this.lhs = lhs;
+            this.rhs = rhs;
         }
     }
 
@@ -21,18 +23,24 @@ public class TabelaSLR {
 
     public static class Acao {
         public final AcaoTipo tipo;
-        public final int valor; // estado para SHIFT
-        public final Regra regra; // regra para REDUCE
-        public Acao(AcaoTipo t, int v, Regra r) { this.tipo = t; this.valor = v; this.regra = r; }
-        public static Acao shift(int st) { return new Acao(AcaoTipo.SHIFT, st, null); }
+        public final int valor;   // estado destino para SHIFT
+        public final Regra regra; // regra gramatical para REDUCE
+
+        public Acao(AcaoTipo t, int v, Regra r) {
+            this.tipo = t;
+            this.valor = v;
+            this.regra = r;
+        }
+
+        public static Acao shift(int st)   { return new Acao(AcaoTipo.SHIFT, st, null); }
         public static Acao reduce(Regra r) { return new Acao(AcaoTipo.REDUCE, 0, r); }
-        public static Acao accept() { return new Acao(AcaoTipo.ACCEPT, 0, null); }
-        public static Acao error() { return new Acao(AcaoTipo.ERROR, 0, null); }
+        public static Acao accept()        { return new Acao(AcaoTipo.ACCEPT, 0, null); }
+        public static Acao error()         { return new Acao(AcaoTipo.ERROR, 0, null); }
     }
 
     private final List<Regra> regras = new ArrayList<>();
-    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> first = new HashMap<>();
-    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> follow = new HashMap<>();
+    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> first = new EnumMap<>(ParserSLR.NaoTerminal.class);
+    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> follow = new EnumMap<>(ParserSLR.NaoTerminal.class);
     private final Map<Integer, Map<Lexer.Tipo, Acao>> tabelaAction = new HashMap<>();
     private final Map<Integer, Map<ParserSLR.NaoTerminal, Integer>> tabelaGoto = new HashMap<>();
 
@@ -40,20 +48,14 @@ public class TabelaSLR {
         definirGramatica();
         carregarFirstPredefinido();
         carregarFollowPredefinido();
-        carregarTabelasPredefinidas();
+        carregarActionPredefinido();
+        carregarGotoPredefinido();
     }
-
-    public List<Regra> getRegras() { return Collections.unmodifiableList(regras); }
-    public Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> getFirst() { return Collections.unmodifiableMap(first); }
-    public Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> getFollow() { return Collections.unmodifiableMap(follow); }
-    public Map<Integer, Map<Lexer.Tipo, Acao>> getTabelaAction() { return Collections.unmodifiableMap(tabelaAction); }
-    public Map<Integer, Map<ParserSLR.NaoTerminal, Integer>> getTabelaGoto() { return Collections.unmodifiableMap(tabelaGoto); }
 
     public Acao obterAcao(int estado, Lexer.Tipo tipo) {
         Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estado);
-        if (linha != null) {
-            Acao a = linha.get(tipo);
-            if (a != null) return a;
+        if (linha != null && linha.containsKey(tipo)) {
+            return linha.get(tipo);
         }
         return Acao.error();
     }
@@ -61,6 +63,22 @@ public class TabelaSLR {
     public Integer obterGoto(int estado, ParserSLR.NaoTerminal nt) {
         Map<ParserSLR.NaoTerminal, Integer> linha = tabelaGoto.get(estado);
         return (linha != null) ? linha.get(nt) : null;
+    }
+
+    public Set<Lexer.Tipo> obterTokensEsperados(int estado) {
+        Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estado);
+        return (linha != null) ? linha.keySet() : Collections.emptySet();
+    }
+
+    public void imprimirFirstFollow() {
+        System.out.println("--------------------------------------------------------------------------");
+        System.out.println("                 CONJUNTOS FIRST E FOLLOW DA GRAMATICA                    ");
+        System.out.println("--------------------------------------------------------------------------");
+        for (ParserSLR.NaoTerminal nt : ParserSLR.NaoTerminal.values()) {
+            System.out.printf("%-14s | FIRST: %-35s | FOLLOW: %s%n",
+                    nt, first.get(nt), follow.get(nt));
+        }
+        System.out.println("--------------------------------------------------------------------------");
     }
 
     private void addR(ParserSLR.NaoTerminal lhs, Object... rhs) {
@@ -71,8 +89,13 @@ public class TabelaSLR {
         tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(t, Acao.shift(prox));
     }
 
-    private void reduce(int st, Lexer.Tipo t, int regraId) {
-        tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(t, Acao.reduce(regras.get(regraId)));
+    // Regra fundamental do SLR(1): quando um estado completa a regra A -> beta,
+    // aplica-se REDUCE para todos os terminais que pertencem ao conjunto FOLLOW(A).
+    private void reduce(int st, int regraId) {
+        Regra r = regras.get(regraId);
+        for (Lexer.Tipo tokenFollow : follow.get(r.lhs)) {
+            tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(tokenFollow, Acao.reduce(r));
+        }
     }
 
     private void accept(int st, Lexer.Tipo t) {
@@ -83,130 +106,126 @@ public class TabelaSLR {
         tabelaGoto.computeIfAbsent(st, k -> new HashMap<>()).put(nt, prox);
     }
 
+    // ==========================================================================
+    // 1. DEFINICAO DAS 44 REGRAS DA GRAMATICA (lalg-java.txt)
+    // ==========================================================================
     private void definirGramatica() {
-        addR(ParserSLR.NaoTerminal.START, ParserSLR.NaoTerminal.PROG);
-        addR(ParserSLR.NaoTerminal.PROG, Lexer.Tipo.PUBLIC, Lexer.Tipo.CLASS, Lexer.Tipo.ID, Lexer.Tipo.ABRE_CHAVE,
+        /* R0  */ addR(ParserSLR.NaoTerminal.START, ParserSLR.NaoTerminal.PROG);
+        /* R1  */ addR(ParserSLR.NaoTerminal.PROG, Lexer.Tipo.PUBLIC, Lexer.Tipo.CLASS, Lexer.Tipo.ID, Lexer.Tipo.ABRE_CHAVE,
                 Lexer.Tipo.PUBLIC, Lexer.Tipo.STATIC, Lexer.Tipo.VOID, Lexer.Tipo.MAIN,
                 Lexer.Tipo.ABRE_PAR, Lexer.Tipo.STRING, Lexer.Tipo.ABRE_COLCH, Lexer.Tipo.FECHA_COLCH,
                 Lexer.Tipo.ID, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.ABRE_CHAVE,
                 ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.FECHA_CHAVE);
-        addR(ParserSLR.NaoTerminal.DC, ParserSLR.NaoTerminal.VAR, ParserSLR.NaoTerminal.MAIS_CMDS);
-        addR(ParserSLR.NaoTerminal.VAR, ParserSLR.NaoTerminal.TIPO, ParserSLR.NaoTerminal.VARS);
-        addR(ParserSLR.NaoTerminal.VARS, Lexer.Tipo.ID, ParserSLR.NaoTerminal.MAIS_VAR);
-        addR(ParserSLR.NaoTerminal.MAIS_VAR, Lexer.Tipo.VIRGULA, ParserSLR.NaoTerminal.VARS);
-        addR(ParserSLR.NaoTerminal.MAIS_VAR); // lambda
-        addR(ParserSLR.NaoTerminal.TIPO, Lexer.Tipo.DOUBLE);
-        addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.CMD, ParserSLR.NaoTerminal.MAIS_CMDS);
-        addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.CMD_COND, ParserSLR.NaoTerminal.CMDS);
-        addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.DC);
-        addR(ParserSLR.NaoTerminal.CMDS); // lambda
-        addR(ParserSLR.NaoTerminal.MAIS_CMDS, Lexer.Tipo.PONTO_VIRG, ParserSLR.NaoTerminal.CMDS);
-        addR(ParserSLR.NaoTerminal.CMD_COND, Lexer.Tipo.IF, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.CONDICAO, Lexer.Tipo.FECHA_PAR,
+        /* R2  */ addR(ParserSLR.NaoTerminal.DC, ParserSLR.NaoTerminal.VAR, ParserSLR.NaoTerminal.MAIS_CMDS);
+        /* R3  */ addR(ParserSLR.NaoTerminal.VAR, ParserSLR.NaoTerminal.TIPO, ParserSLR.NaoTerminal.VARS);
+        /* R4  */ addR(ParserSLR.NaoTerminal.VARS, Lexer.Tipo.ID, ParserSLR.NaoTerminal.MAIS_VAR);
+        /* R5  */ addR(ParserSLR.NaoTerminal.MAIS_VAR, Lexer.Tipo.VIRGULA, ParserSLR.NaoTerminal.VARS);
+        /* R6  */ addR(ParserSLR.NaoTerminal.MAIS_VAR); // lambda
+        /* R7  */ addR(ParserSLR.NaoTerminal.TIPO, Lexer.Tipo.DOUBLE);
+        /* R8  */ addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.CMD, ParserSLR.NaoTerminal.MAIS_CMDS);
+        /* R9  */ addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.CMD_COND, ParserSLR.NaoTerminal.CMDS);
+        /* R10 */ addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.DC);
+        /* R11 */ addR(ParserSLR.NaoTerminal.CMDS); // lambda
+        /* R12 */ addR(ParserSLR.NaoTerminal.MAIS_CMDS, Lexer.Tipo.PONTO_VIRG, ParserSLR.NaoTerminal.CMDS);
+        /* R13 */ addR(ParserSLR.NaoTerminal.CMD_COND, Lexer.Tipo.IF, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.CONDICAO, Lexer.Tipo.FECHA_PAR,
                 Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE, ParserSLR.NaoTerminal.PFALSA);
-        addR(ParserSLR.NaoTerminal.CMD_COND, Lexer.Tipo.WHILE, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.CONDICAO, Lexer.Tipo.FECHA_PAR,
+        /* R14 */ addR(ParserSLR.NaoTerminal.CMD_COND, Lexer.Tipo.WHILE, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.CONDICAO, Lexer.Tipo.FECHA_PAR,
                 Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE);
-        addR(ParserSLR.NaoTerminal.CMD, Lexer.Tipo.PRINT, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.EXPRESSAO, Lexer.Tipo.FECHA_PAR);
-        addR(ParserSLR.NaoTerminal.CMD, Lexer.Tipo.ID, ParserSLR.NaoTerminal.RESTO_IDENT);
-        addR(ParserSLR.NaoTerminal.PFALSA, Lexer.Tipo.ELSE, Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE);
-        addR(ParserSLR.NaoTerminal.PFALSA); // lambda
-        addR(ParserSLR.NaoTerminal.RESTO_IDENT, Lexer.Tipo.ATRIB, ParserSLR.NaoTerminal.EXP_IDENT);
-        addR(ParserSLR.NaoTerminal.EXP_IDENT, ParserSLR.NaoTerminal.EXPRESSAO);
-        addR(ParserSLR.NaoTerminal.EXP_IDENT, Lexer.Tipo.LER_DOUBLE);
-        addR(ParserSLR.NaoTerminal.CONDICAO, ParserSLR.NaoTerminal.EXPRESSAO, ParserSLR.NaoTerminal.RELACAO, ParserSLR.NaoTerminal.EXPRESSAO);
-        addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.EQ);
-        addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.NE);
-        addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.GE);
-        addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.LE);
-        addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.GT);
-        addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.LT);
-        addR(ParserSLR.NaoTerminal.EXPRESSAO, ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OUTROS_TERMOS);
-        addR(ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OP_UN, ParserSLR.NaoTerminal.FATOR, ParserSLR.NaoTerminal.MAIS_FATORES);
-        addR(ParserSLR.NaoTerminal.OP_UN, Lexer.Tipo.MENOS);
-        addR(ParserSLR.NaoTerminal.OP_UN); // lambda
-        addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.ID);
-        addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.NUMERO_REAL);
-        addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.EXPRESSAO, Lexer.Tipo.FECHA_PAR);
-        addR(ParserSLR.NaoTerminal.OUTROS_TERMOS, ParserSLR.NaoTerminal.OP_AD, ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OUTROS_TERMOS);
-        addR(ParserSLR.NaoTerminal.OUTROS_TERMOS); // lambda
-        addR(ParserSLR.NaoTerminal.OP_AD, Lexer.Tipo.MAIS);
-        addR(ParserSLR.NaoTerminal.OP_AD, Lexer.Tipo.MENOS);
-        addR(ParserSLR.NaoTerminal.MAIS_FATORES, ParserSLR.NaoTerminal.OP_MUL, ParserSLR.NaoTerminal.FATOR, ParserSLR.NaoTerminal.MAIS_FATORES);
-        addR(ParserSLR.NaoTerminal.MAIS_FATORES); // lambda
-        addR(ParserSLR.NaoTerminal.OP_MUL, Lexer.Tipo.MULT);
-        addR(ParserSLR.NaoTerminal.OP_MUL, Lexer.Tipo.DIV);
+        /* R15 */ addR(ParserSLR.NaoTerminal.CMD, Lexer.Tipo.PRINT, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.EXPRESSAO, Lexer.Tipo.FECHA_PAR);
+        /* R16 */ addR(ParserSLR.NaoTerminal.CMD, Lexer.Tipo.ID, ParserSLR.NaoTerminal.RESTO_IDENT);
+        /* R17 */ addR(ParserSLR.NaoTerminal.PFALSA, Lexer.Tipo.ELSE, Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE);
+        /* R18 */ addR(ParserSLR.NaoTerminal.PFALSA); // lambda
+        /* R19 */ addR(ParserSLR.NaoTerminal.RESTO_IDENT, Lexer.Tipo.ATRIB, ParserSLR.NaoTerminal.EXP_IDENT);
+        /* R20 */ addR(ParserSLR.NaoTerminal.EXP_IDENT, ParserSLR.NaoTerminal.EXPRESSAO);
+        /* R21 */ addR(ParserSLR.NaoTerminal.EXP_IDENT, Lexer.Tipo.LER_DOUBLE);
+        /* R22 */ addR(ParserSLR.NaoTerminal.CONDICAO, ParserSLR.NaoTerminal.EXPRESSAO, ParserSLR.NaoTerminal.RELACAO, ParserSLR.NaoTerminal.EXPRESSAO);
+        /* R23 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.EQ);
+        /* R24 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.NE);
+        /* R25 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.GE);
+        /* R26 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.LE);
+        /* R27 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.GT);
+        /* R28 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.LT);
+        /* R29 */ addR(ParserSLR.NaoTerminal.EXPRESSAO, ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OUTROS_TERMOS);
+        /* R30 */ addR(ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OP_UN, ParserSLR.NaoTerminal.FATOR, ParserSLR.NaoTerminal.MAIS_FATORES);
+        /* R31 */ addR(ParserSLR.NaoTerminal.OP_UN, Lexer.Tipo.MENOS);
+        /* R32 */ addR(ParserSLR.NaoTerminal.OP_UN); // lambda
+        /* R33 */ addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.ID);
+        /* R34 */ addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.NUMERO_REAL);
+        /* R35 */ addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.EXPRESSAO, Lexer.Tipo.FECHA_PAR);
+        /* R36 */ addR(ParserSLR.NaoTerminal.OUTROS_TERMOS, ParserSLR.NaoTerminal.OP_AD, ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OUTROS_TERMOS);
+        /* R37 */ addR(ParserSLR.NaoTerminal.OUTROS_TERMOS); // lambda
+        /* R38 */ addR(ParserSLR.NaoTerminal.OP_AD, Lexer.Tipo.MAIS);
+        /* R39 */ addR(ParserSLR.NaoTerminal.OP_AD, Lexer.Tipo.MENOS);
+        /* R40 */ addR(ParserSLR.NaoTerminal.MAIS_FATORES, ParserSLR.NaoTerminal.OP_MUL, ParserSLR.NaoTerminal.FATOR, ParserSLR.NaoTerminal.MAIS_FATORES);
+        /* R41 */ addR(ParserSLR.NaoTerminal.MAIS_FATORES); // lambda
+        /* R42 */ addR(ParserSLR.NaoTerminal.OP_MUL, Lexer.Tipo.MULT);
+        /* R43 */ addR(ParserSLR.NaoTerminal.OP_MUL, Lexer.Tipo.DIV);
     }
 
     // ==========================================================================
-    // CONJUNTOS FIRST PRE-SETADOS (IMUTAVEIS DA GRAMATICA)
+    // 2. CONJUNTOS FIRST PRE-SETADOS DA GRAMATICA
     // ==========================================================================
     private void carregarFirstPredefinido() {
-        first.put(ParserSLR.NaoTerminal.START, new HashSet<>(Arrays.asList(Lexer.Tipo.PUBLIC)));
-        first.put(ParserSLR.NaoTerminal.PROG, new HashSet<>(Arrays.asList(Lexer.Tipo.PUBLIC)));
-        first.put(ParserSLR.NaoTerminal.DC, new HashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
-        first.put(ParserSLR.NaoTerminal.VAR, new HashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
-        first.put(ParserSLR.NaoTerminal.VARS, new HashSet<>(Arrays.asList(Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.MAIS_VAR, new HashSet<>(Arrays.asList(Lexer.Tipo.VIRGULA)));
-        first.put(ParserSLR.NaoTerminal.TIPO, new HashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
-        first.put(ParserSLR.NaoTerminal.CMDS, new HashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.MAIS_CMDS, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        first.put(ParserSLR.NaoTerminal.CMD_COND, new HashSet<>(Arrays.asList(Lexer.Tipo.IF, Lexer.Tipo.WHILE)));
-        first.put(ParserSLR.NaoTerminal.CMD, new HashSet<>(Arrays.asList(Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.PFALSA, new HashSet<>(Arrays.asList(Lexer.Tipo.ELSE)));
-        first.put(ParserSLR.NaoTerminal.RESTO_IDENT, new HashSet<>(Arrays.asList(Lexer.Tipo.ATRIB)));
-        first.put(ParserSLR.NaoTerminal.EXP_IDENT, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.LER_DOUBLE, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.CONDICAO, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.RELACAO, new HashSet<>(Arrays.asList(Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.GT)));
-        first.put(ParserSLR.NaoTerminal.EXPRESSAO, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.TERMO, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.OP_UN, new HashSet<>(Arrays.asList(Lexer.Tipo.MENOS)));
-        first.put(ParserSLR.NaoTerminal.FATOR, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.OUTROS_TERMOS, new HashSet<>(Arrays.asList(Lexer.Tipo.MAIS, Lexer.Tipo.MENOS)));
-        first.put(ParserSLR.NaoTerminal.OP_AD, new HashSet<>(Arrays.asList(Lexer.Tipo.MAIS, Lexer.Tipo.MENOS)));
-        first.put(ParserSLR.NaoTerminal.MAIS_FATORES, new HashSet<>(Arrays.asList(Lexer.Tipo.MULT, Lexer.Tipo.DIV)));
-        first.put(ParserSLR.NaoTerminal.OP_MUL, new HashSet<>(Arrays.asList(Lexer.Tipo.MULT, Lexer.Tipo.DIV)));
+        first.put(ParserSLR.NaoTerminal.START, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PUBLIC)));
+        first.put(ParserSLR.NaoTerminal.PROG, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PUBLIC)));
+        first.put(ParserSLR.NaoTerminal.DC, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
+        first.put(ParserSLR.NaoTerminal.VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
+        first.put(ParserSLR.NaoTerminal.VARS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.MAIS_VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.VIRGULA)));
+        first.put(ParserSLR.NaoTerminal.TIPO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
+        first.put(ParserSLR.NaoTerminal.CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.MAIS_CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        first.put(ParserSLR.NaoTerminal.CMD_COND, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.IF, Lexer.Tipo.WHILE)));
+        first.put(ParserSLR.NaoTerminal.CMD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.PFALSA, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ELSE)));
+        first.put(ParserSLR.NaoTerminal.RESTO_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ATRIB)));
+        first.put(ParserSLR.NaoTerminal.EXP_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.LER_DOUBLE, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.CONDICAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.RELACAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.GT)));
+        first.put(ParserSLR.NaoTerminal.EXPRESSAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.TERMO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.OP_UN, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MENOS)));
+        first.put(ParserSLR.NaoTerminal.FATOR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        first.put(ParserSLR.NaoTerminal.OUTROS_TERMOS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MAIS, Lexer.Tipo.MENOS)));
+        first.put(ParserSLR.NaoTerminal.OP_AD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MAIS, Lexer.Tipo.MENOS)));
+        first.put(ParserSLR.NaoTerminal.MAIS_FATORES, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MULT, Lexer.Tipo.DIV)));
+        first.put(ParserSLR.NaoTerminal.OP_MUL, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MULT, Lexer.Tipo.DIV)));
     }
 
     // ==========================================================================
-    // CONJUNTOS FOLLOW PRE-SETADOS (IMUTAVEIS DA GRAMATICA)
+    // 3. CONJUNTOS FOLLOW PRE-SETADOS DA GRAMATICA (USADOS NAS REDUCOES SLR)
     // ==========================================================================
     private void carregarFollowPredefinido() {
-        follow.put(ParserSLR.NaoTerminal.START, new HashSet<>(Arrays.asList(Lexer.Tipo.EOF)));
-        follow.put(ParserSLR.NaoTerminal.PROG, new HashSet<>(Arrays.asList(Lexer.Tipo.EOF)));
-        follow.put(ParserSLR.NaoTerminal.DC, new HashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
-        follow.put(ParserSLR.NaoTerminal.VAR, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.VARS, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.MAIS_VAR, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.TIPO, new HashSet<>(Arrays.asList(Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.CMDS, new HashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
-        follow.put(ParserSLR.NaoTerminal.MAIS_CMDS, new HashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
-        follow.put(ParserSLR.NaoTerminal.CMD_COND, new HashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.CMD, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.PFALSA, new HashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.RESTO_IDENT, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.EXP_IDENT, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.CONDICAO, new HashSet<>(Arrays.asList(Lexer.Tipo.FECHA_PAR)));
-        follow.put(ParserSLR.NaoTerminal.RELACAO, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.EXPRESSAO, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.TERMO, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.OP_UN, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.FATOR, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MULT, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT, Lexer.Tipo.DIV)));
-        follow.put(ParserSLR.NaoTerminal.OUTROS_TERMOS, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.OP_AD, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.MAIS_FATORES, new HashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.OP_MUL, new HashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.START, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.EOF)));
+        follow.put(ParserSLR.NaoTerminal.PROG, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.EOF)));
+        follow.put(ParserSLR.NaoTerminal.DC, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
+        follow.put(ParserSLR.NaoTerminal.VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        follow.put(ParserSLR.NaoTerminal.VARS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        follow.put(ParserSLR.NaoTerminal.MAIS_VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        follow.put(ParserSLR.NaoTerminal.TIPO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
+        follow.put(ParserSLR.NaoTerminal.MAIS_CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
+        follow.put(ParserSLR.NaoTerminal.CMD_COND, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.CMD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        follow.put(ParserSLR.NaoTerminal.PFALSA, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.RESTO_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        follow.put(ParserSLR.NaoTerminal.EXP_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
+        follow.put(ParserSLR.NaoTerminal.CONDICAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_PAR)));
+        follow.put(ParserSLR.NaoTerminal.RELACAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.EXPRESSAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.GT)));
+        follow.put(ParserSLR.NaoTerminal.TERMO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT)));
+        follow.put(ParserSLR.NaoTerminal.OP_UN, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.FATOR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MULT, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT, Lexer.Tipo.DIV)));
+        follow.put(ParserSLR.NaoTerminal.OUTROS_TERMOS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.GT)));
+        follow.put(ParserSLR.NaoTerminal.OP_AD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+        follow.put(ParserSLR.NaoTerminal.MAIS_FATORES, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT)));
+        follow.put(ParserSLR.NaoTerminal.OP_MUL, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
     }
 
     // ==========================================================================
-    // TABELAS SLR PRE-SETADAS (ACTION & GOTO)
+    // 4. TABELA ACTION DOS 95 ESTADOS CANONICOS LR(0)
     // ==========================================================================
-    private void carregarTabelasPredefinidas() {
-        carregarAcoesParte1();
-        carregarAcoesParte2();
-        carregarAcoesParte3();
-        carregarGotoPredefinido();
-    }
-
-    private void carregarAcoesParte1() {
+    private void carregarActionPredefinido() {
         shift(0, Lexer.Tipo.PUBLIC, 1);
         shift(1, Lexer.Tipo.CLASS, 3);
         accept(2, Lexer.Tipo.EOF);
@@ -223,311 +242,179 @@ public class TabelaSLR {
         shift(13, Lexer.Tipo.ID, 14);
         shift(14, Lexer.Tipo.FECHA_PAR, 15);
         shift(15, Lexer.Tipo.ABRE_CHAVE, 16);
+
+        // Estado 16: Hub de comandos no inicio do main
         shift(16, Lexer.Tipo.DOUBLE, 17);
-        reduce(16, Lexer.Tipo.FECHA_CHAVE, 11);
-        shift(16, Lexer.Tipo.ID, 21);
         shift(16, Lexer.Tipo.IF, 18);
-        shift(16, Lexer.Tipo.PRINT, 20);
         shift(16, Lexer.Tipo.WHILE, 19);
-        reduce(17, Lexer.Tipo.ID, 7);
+        shift(16, Lexer.Tipo.PRINT, 20);
+        shift(16, Lexer.Tipo.ID, 21);
+        reduce(16, 11); // CMDS -> lambda
+
+        reduce(17, 7);  // TIPO -> double
         shift(18, Lexer.Tipo.ABRE_PAR, 28);
         shift(19, Lexer.Tipo.ABRE_PAR, 29);
         shift(20, Lexer.Tipo.ABRE_PAR, 30);
         shift(21, Lexer.Tipo.ATRIB, 31);
-        reduce(22, Lexer.Tipo.FECHA_CHAVE, 10);
+        reduce(22, 10); // CMDS -> DC
         shift(23, Lexer.Tipo.PONTO_VIRG, 33);
         shift(24, Lexer.Tipo.ID, 35);
         shift(25, Lexer.Tipo.FECHA_CHAVE, 37);
+
+        // Estado 26: Comandos apos um bloco condicional (if/while)
         shift(26, Lexer.Tipo.DOUBLE, 17);
-        reduce(26, Lexer.Tipo.FECHA_CHAVE, 11);
-        shift(26, Lexer.Tipo.ID, 21);
         shift(26, Lexer.Tipo.IF, 18);
-        shift(26, Lexer.Tipo.PRINT, 20);
         shift(26, Lexer.Tipo.WHILE, 19);
+        shift(26, Lexer.Tipo.PRINT, 20);
+        shift(26, Lexer.Tipo.ID, 21);
+        reduce(26, 11); // CMDS -> lambda
+
         shift(27, Lexer.Tipo.PONTO_VIRG, 33);
-        reduce(28, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(28, Lexer.Tipo.ID, 32);
         shift(28, Lexer.Tipo.MENOS, 40);
-        reduce(28, Lexer.Tipo.NUMERO_REAL, 32);
-        reduce(29, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(29, Lexer.Tipo.ID, 32);
+        reduce(28, 32); // OP_UN -> lambda
         shift(29, Lexer.Tipo.MENOS, 40);
-        reduce(29, Lexer.Tipo.NUMERO_REAL, 32);
-        reduce(30, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(30, Lexer.Tipo.ID, 32);
+        reduce(29, 32); // OP_UN -> lambda
         shift(30, Lexer.Tipo.MENOS, 40);
-        reduce(30, Lexer.Tipo.NUMERO_REAL, 32);
-        reduce(31, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(31, Lexer.Tipo.ID, 32);
+        reduce(30, 32); // OP_UN -> lambda
         shift(31, Lexer.Tipo.LER_DOUBLE, 47);
         shift(31, Lexer.Tipo.MENOS, 40);
-        reduce(31, Lexer.Tipo.NUMERO_REAL, 32);
-        reduce(32, Lexer.Tipo.PONTO_VIRG, 16);
+        reduce(31, 32); // OP_UN -> lambda
+        reduce(32, 16); // CMD -> id RESTO_IDENT
+
+        // Estado 33: Comandos apos ponto-e-virgula
         shift(33, Lexer.Tipo.DOUBLE, 17);
-        reduce(33, Lexer.Tipo.FECHA_CHAVE, 11);
-        shift(33, Lexer.Tipo.ID, 21);
         shift(33, Lexer.Tipo.IF, 18);
-        shift(33, Lexer.Tipo.PRINT, 20);
         shift(33, Lexer.Tipo.WHILE, 19);
-        reduce(34, Lexer.Tipo.FECHA_CHAVE, 2);
-        reduce(35, Lexer.Tipo.PONTO_VIRG, 6);
+        shift(33, Lexer.Tipo.PRINT, 20);
+        shift(33, Lexer.Tipo.ID, 21);
+        reduce(33, 11); // CMDS -> lambda
+
+        reduce(34, 2);  // DC -> VAR MAIS_CMDS
         shift(35, Lexer.Tipo.VIRGULA, 51);
-        reduce(36, Lexer.Tipo.PONTO_VIRG, 3);
+        reduce(35, 6);  // MAIS_VAR -> lambda
+        reduce(36, 3);  // VAR -> TIPO VARS
         shift(37, Lexer.Tipo.FECHA_CHAVE, 53);
-        reduce(38, Lexer.Tipo.FECHA_CHAVE, 9);
-        reduce(39, Lexer.Tipo.FECHA_CHAVE, 8);
-        reduce(40, Lexer.Tipo.ABRE_PAR, 31);
-        reduce(40, Lexer.Tipo.ID, 31);
-        reduce(40, Lexer.Tipo.NUMERO_REAL, 31);
+        reduce(38, 9);  // CMDS -> CMD_COND CMDS
+        reduce(39, 8);  // CMDS -> CMD MAIS_CMDS
+        reduce(40, 31); // OP_UN -> -
         shift(41, Lexer.Tipo.FECHA_PAR, 54);
+
+        // Estado 42: Operadores relacionais
         shift(42, Lexer.Tipo.EQ, 55);
-        shift(42, Lexer.Tipo.GE, 57);
-        shift(42, Lexer.Tipo.GT, 59);
-        shift(42, Lexer.Tipo.LE, 58);
-        shift(42, Lexer.Tipo.LT, 60);
         shift(42, Lexer.Tipo.NE, 56);
-        reduce(43, Lexer.Tipo.EQ, 37);
-        reduce(43, Lexer.Tipo.FECHA_PAR, 37);
-        reduce(43, Lexer.Tipo.GE, 37);
-        reduce(43, Lexer.Tipo.GT, 37);
-        reduce(43, Lexer.Tipo.LE, 37);
-        reduce(43, Lexer.Tipo.LT, 37);
+        shift(42, Lexer.Tipo.GE, 57);
+        shift(42, Lexer.Tipo.LE, 58);
+        shift(42, Lexer.Tipo.GT, 59);
+        shift(42, Lexer.Tipo.LT, 60);
+
         shift(43, Lexer.Tipo.MAIS, 62);
         shift(43, Lexer.Tipo.MENOS, 63);
-        reduce(43, Lexer.Tipo.NE, 37);
-        reduce(43, Lexer.Tipo.PONTO_VIRG, 37);
-        shift(44, Lexer.Tipo.ABRE_PAR, 68);
+        reduce(43, 37); // OUTROS_TERMOS -> lambda
+
         shift(44, Lexer.Tipo.ID, 66);
         shift(44, Lexer.Tipo.NUMERO_REAL, 67);
+        shift(44, Lexer.Tipo.ABRE_PAR, 68);
         shift(45, Lexer.Tipo.FECHA_PAR, 70);
         shift(46, Lexer.Tipo.FECHA_PAR, 71);
-        reduce(47, Lexer.Tipo.PONTO_VIRG, 21);
-        reduce(48, Lexer.Tipo.PONTO_VIRG, 19);
-        reduce(49, Lexer.Tipo.PONTO_VIRG, 20);
-        reduce(50, Lexer.Tipo.FECHA_CHAVE, 12);
+        reduce(47, 21); // EXP_IDENT -> lerDouble()
+        reduce(48, 19); // RESTO_IDENT -> = EXP_IDENT
+        reduce(49, 20); // EXP_IDENT -> EXPRESSAO
+        reduce(50, 12); // MAIS_CMDS -> ; CMDS
         shift(51, Lexer.Tipo.ID, 35);
-        reduce(52, Lexer.Tipo.PONTO_VIRG, 4);
-        reduce(53, Lexer.Tipo.EOF, 1);
+        reduce(52, 4);  // VARS -> id MAIS_VAR
+        reduce(53, 1);  // PROG -> public class id ...
         shift(54, Lexer.Tipo.ABRE_CHAVE, 73);
-        reduce(55, Lexer.Tipo.ABRE_PAR, 23);
-        reduce(55, Lexer.Tipo.ID, 23);
-        reduce(55, Lexer.Tipo.MENOS, 23);
-        reduce(55, Lexer.Tipo.NUMERO_REAL, 23);
-        reduce(56, Lexer.Tipo.ABRE_PAR, 24);
-        reduce(56, Lexer.Tipo.ID, 24);
-        reduce(56, Lexer.Tipo.MENOS, 24);
-        reduce(56, Lexer.Tipo.NUMERO_REAL, 24);
-    }
 
-    private void carregarAcoesParte2() {
-        reduce(57, Lexer.Tipo.ABRE_PAR, 25);
-        reduce(57, Lexer.Tipo.ID, 25);
-        reduce(57, Lexer.Tipo.MENOS, 25);
-        reduce(57, Lexer.Tipo.NUMERO_REAL, 25);
-        reduce(58, Lexer.Tipo.ABRE_PAR, 26);
-        reduce(58, Lexer.Tipo.ID, 26);
-        reduce(58, Lexer.Tipo.MENOS, 26);
-        reduce(58, Lexer.Tipo.NUMERO_REAL, 26);
-        reduce(59, Lexer.Tipo.ABRE_PAR, 27);
-        reduce(59, Lexer.Tipo.ID, 27);
-        reduce(59, Lexer.Tipo.MENOS, 27);
-        reduce(59, Lexer.Tipo.NUMERO_REAL, 27);
-        reduce(60, Lexer.Tipo.ABRE_PAR, 28);
-        reduce(60, Lexer.Tipo.ID, 28);
-        reduce(60, Lexer.Tipo.MENOS, 28);
-        reduce(60, Lexer.Tipo.NUMERO_REAL, 28);
-        reduce(61, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(61, Lexer.Tipo.ID, 32);
+        reduce(55, 23); // RELACAO -> ==
+        reduce(56, 24); // RELACAO -> !=
+        reduce(57, 25); // RELACAO -> >=
+        reduce(58, 26); // RELACAO -> <=
+        reduce(59, 27); // RELACAO -> >
+        reduce(60, 28); // RELACAO -> <
+
         shift(61, Lexer.Tipo.MENOS, 40);
-        reduce(61, Lexer.Tipo.NUMERO_REAL, 32);
-        reduce(62, Lexer.Tipo.ABRE_PAR, 38);
-        reduce(62, Lexer.Tipo.ID, 38);
-        reduce(62, Lexer.Tipo.MENOS, 38);
-        reduce(62, Lexer.Tipo.NUMERO_REAL, 38);
-        reduce(63, Lexer.Tipo.ABRE_PAR, 39);
-        reduce(63, Lexer.Tipo.ID, 39);
-        reduce(63, Lexer.Tipo.MENOS, 39);
-        reduce(63, Lexer.Tipo.NUMERO_REAL, 39);
-        reduce(64, Lexer.Tipo.EQ, 29);
-        reduce(64, Lexer.Tipo.FECHA_PAR, 29);
-        reduce(64, Lexer.Tipo.GE, 29);
-        reduce(64, Lexer.Tipo.GT, 29);
-        reduce(64, Lexer.Tipo.LE, 29);
-        reduce(64, Lexer.Tipo.LT, 29);
-        reduce(64, Lexer.Tipo.NE, 29);
-        reduce(64, Lexer.Tipo.PONTO_VIRG, 29);
-        reduce(65, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(65, Lexer.Tipo.ID, 32);
+        reduce(61, 32); // OP_UN -> lambda
+        reduce(62, 38); // OP_AD -> +
+        reduce(63, 39); // OP_AD -> -
+        reduce(64, 29); // EXPRESSAO -> TERMO OUTROS_TERMOS
         shift(65, Lexer.Tipo.MENOS, 40);
-        reduce(65, Lexer.Tipo.NUMERO_REAL, 32);
-        reduce(66, Lexer.Tipo.DIV, 33);
-        reduce(66, Lexer.Tipo.EQ, 33);
-        reduce(66, Lexer.Tipo.FECHA_PAR, 33);
-        reduce(66, Lexer.Tipo.GE, 33);
-        reduce(66, Lexer.Tipo.GT, 33);
-        reduce(66, Lexer.Tipo.LE, 33);
-        reduce(66, Lexer.Tipo.LT, 33);
-        reduce(66, Lexer.Tipo.MAIS, 33);
-        reduce(66, Lexer.Tipo.MENOS, 33);
-        reduce(66, Lexer.Tipo.MULT, 33);
-        reduce(66, Lexer.Tipo.NE, 33);
-        reduce(66, Lexer.Tipo.PONTO_VIRG, 33);
-        reduce(67, Lexer.Tipo.DIV, 34);
-        reduce(67, Lexer.Tipo.EQ, 34);
-        reduce(67, Lexer.Tipo.FECHA_PAR, 34);
-        reduce(67, Lexer.Tipo.GE, 34);
-        reduce(67, Lexer.Tipo.GT, 34);
-        reduce(67, Lexer.Tipo.LE, 34);
-        reduce(67, Lexer.Tipo.LT, 34);
-        reduce(67, Lexer.Tipo.MAIS, 34);
-        reduce(67, Lexer.Tipo.MENOS, 34);
-        reduce(67, Lexer.Tipo.MULT, 34);
-        reduce(67, Lexer.Tipo.NE, 34);
-        reduce(67, Lexer.Tipo.PONTO_VIRG, 34);
-        reduce(68, Lexer.Tipo.ABRE_PAR, 32);
-        reduce(68, Lexer.Tipo.ID, 32);
+        reduce(65, 32); // OP_UN -> lambda
+        reduce(66, 33); // FATOR -> id
+        reduce(67, 34); // FATOR -> numero_real
         shift(68, Lexer.Tipo.MENOS, 40);
-        reduce(68, Lexer.Tipo.NUMERO_REAL, 32);
-        shift(69, Lexer.Tipo.DIV, 78);
-        reduce(69, Lexer.Tipo.EQ, 41);
-        reduce(69, Lexer.Tipo.FECHA_PAR, 41);
-        reduce(69, Lexer.Tipo.GE, 41);
-        reduce(69, Lexer.Tipo.GT, 41);
-        reduce(69, Lexer.Tipo.LE, 41);
-        reduce(69, Lexer.Tipo.LT, 41);
-        reduce(69, Lexer.Tipo.MAIS, 41);
-        reduce(69, Lexer.Tipo.MENOS, 41);
+        reduce(68, 32); // OP_UN -> lambda
+
         shift(69, Lexer.Tipo.MULT, 77);
-        reduce(69, Lexer.Tipo.NE, 41);
-        reduce(69, Lexer.Tipo.PONTO_VIRG, 41);
+        shift(69, Lexer.Tipo.DIV, 78);
+        reduce(69, 41); // MAIS_FATORES -> lambda
+
         shift(70, Lexer.Tipo.ABRE_CHAVE, 81);
-        reduce(71, Lexer.Tipo.PONTO_VIRG, 15);
-        reduce(72, Lexer.Tipo.PONTO_VIRG, 5);
+        reduce(71, 15); // CMD -> System.out.println ( EXPRESSAO )
+        reduce(72, 5);  // MAIS_VAR -> , VARS
+
+        // Estado 73: Corpo do bloco if
         shift(73, Lexer.Tipo.DOUBLE, 17);
-        reduce(73, Lexer.Tipo.FECHA_CHAVE, 11);
-        shift(73, Lexer.Tipo.ID, 21);
         shift(73, Lexer.Tipo.IF, 18);
-        shift(73, Lexer.Tipo.PRINT, 20);
         shift(73, Lexer.Tipo.WHILE, 19);
-        reduce(74, Lexer.Tipo.FECHA_PAR, 22);
-        reduce(75, Lexer.Tipo.EQ, 37);
-        reduce(75, Lexer.Tipo.FECHA_PAR, 37);
-        reduce(75, Lexer.Tipo.GE, 37);
-        reduce(75, Lexer.Tipo.GT, 37);
-        reduce(75, Lexer.Tipo.LE, 37);
-        reduce(75, Lexer.Tipo.LT, 37);
+        shift(73, Lexer.Tipo.PRINT, 20);
+        shift(73, Lexer.Tipo.ID, 21);
+        reduce(73, 11); // CMDS -> lambda
+
+        reduce(74, 22); // CONDICAO -> EXPRESSAO RELACAO EXPRESSAO
         shift(75, Lexer.Tipo.MAIS, 62);
         shift(75, Lexer.Tipo.MENOS, 63);
-        reduce(75, Lexer.Tipo.NE, 37);
-        reduce(75, Lexer.Tipo.PONTO_VIRG, 37);
+        reduce(75, 37); // OUTROS_TERMOS -> lambda
         shift(76, Lexer.Tipo.FECHA_PAR, 84);
-        reduce(77, Lexer.Tipo.ABRE_PAR, 42);
-        reduce(77, Lexer.Tipo.ID, 42);
-        reduce(77, Lexer.Tipo.NUMERO_REAL, 42);
-        reduce(78, Lexer.Tipo.ABRE_PAR, 43);
-        reduce(78, Lexer.Tipo.ID, 43);
-        reduce(78, Lexer.Tipo.NUMERO_REAL, 43);
-        reduce(79, Lexer.Tipo.EQ, 30);
-        reduce(79, Lexer.Tipo.FECHA_PAR, 30);
-        reduce(79, Lexer.Tipo.GE, 30);
-    }
+        reduce(77, 42); // OP_MUL -> *
+        reduce(78, 43); // OP_MUL -> /
+        reduce(79, 30); // TERMO -> OP_UN FATOR MAIS_FATORES
 
-    private void carregarAcoesParte3() {
-        reduce(79, Lexer.Tipo.GT, 30);
-        reduce(79, Lexer.Tipo.LE, 30);
-        reduce(79, Lexer.Tipo.LT, 30);
-        reduce(79, Lexer.Tipo.MAIS, 30);
-        reduce(79, Lexer.Tipo.MENOS, 30);
-        reduce(79, Lexer.Tipo.NE, 30);
-        reduce(79, Lexer.Tipo.PONTO_VIRG, 30);
-        shift(80, Lexer.Tipo.ABRE_PAR, 68);
         shift(80, Lexer.Tipo.ID, 66);
         shift(80, Lexer.Tipo.NUMERO_REAL, 67);
+        shift(80, Lexer.Tipo.ABRE_PAR, 68);
+
+        // Estado 81: Corpo do bloco while
         shift(81, Lexer.Tipo.DOUBLE, 17);
-        reduce(81, Lexer.Tipo.FECHA_CHAVE, 11);
-        shift(81, Lexer.Tipo.ID, 21);
         shift(81, Lexer.Tipo.IF, 18);
-        shift(81, Lexer.Tipo.PRINT, 20);
         shift(81, Lexer.Tipo.WHILE, 19);
+        shift(81, Lexer.Tipo.PRINT, 20);
+        shift(81, Lexer.Tipo.ID, 21);
+        reduce(81, 11); // CMDS -> lambda
+
         shift(82, Lexer.Tipo.FECHA_CHAVE, 87);
-        reduce(83, Lexer.Tipo.EQ, 36);
-        reduce(83, Lexer.Tipo.FECHA_PAR, 36);
-        reduce(83, Lexer.Tipo.GE, 36);
-        reduce(83, Lexer.Tipo.GT, 36);
-        reduce(83, Lexer.Tipo.LE, 36);
-        reduce(83, Lexer.Tipo.LT, 36);
-        reduce(83, Lexer.Tipo.NE, 36);
-        reduce(83, Lexer.Tipo.PONTO_VIRG, 36);
-        reduce(84, Lexer.Tipo.DIV, 35);
-        reduce(84, Lexer.Tipo.EQ, 35);
-        reduce(84, Lexer.Tipo.FECHA_PAR, 35);
-        reduce(84, Lexer.Tipo.GE, 35);
-        reduce(84, Lexer.Tipo.GT, 35);
-        reduce(84, Lexer.Tipo.LE, 35);
-        reduce(84, Lexer.Tipo.LT, 35);
-        reduce(84, Lexer.Tipo.MAIS, 35);
-        reduce(84, Lexer.Tipo.MENOS, 35);
-        reduce(84, Lexer.Tipo.MULT, 35);
-        reduce(84, Lexer.Tipo.NE, 35);
-        reduce(84, Lexer.Tipo.PONTO_VIRG, 35);
-        shift(85, Lexer.Tipo.DIV, 78);
-        reduce(85, Lexer.Tipo.EQ, 41);
-        reduce(85, Lexer.Tipo.FECHA_PAR, 41);
-        reduce(85, Lexer.Tipo.GE, 41);
-        reduce(85, Lexer.Tipo.GT, 41);
-        reduce(85, Lexer.Tipo.LE, 41);
-        reduce(85, Lexer.Tipo.LT, 41);
-        reduce(85, Lexer.Tipo.MAIS, 41);
-        reduce(85, Lexer.Tipo.MENOS, 41);
+        reduce(83, 36); // OUTROS_TERMOS -> OP_AD TERMO OUTROS_TERMOS
+        reduce(84, 35); // FATOR -> ( EXPRESSAO )
+
         shift(85, Lexer.Tipo.MULT, 77);
-        reduce(85, Lexer.Tipo.NE, 41);
-        reduce(85, Lexer.Tipo.PONTO_VIRG, 41);
+        shift(85, Lexer.Tipo.DIV, 78);
+        reduce(85, 41); // MAIS_FATORES -> lambda
+
         shift(86, Lexer.Tipo.FECHA_CHAVE, 89);
-        reduce(87, Lexer.Tipo.DOUBLE, 18);
+
+        // Estado 87: Fechamento do if (decide entre else ou PFALSA -> lambda)
         shift(87, Lexer.Tipo.ELSE, 90);
-        reduce(87, Lexer.Tipo.FECHA_CHAVE, 18);
-        reduce(87, Lexer.Tipo.ID, 18);
-        reduce(87, Lexer.Tipo.IF, 18);
-        reduce(87, Lexer.Tipo.PRINT, 18);
-        reduce(87, Lexer.Tipo.WHILE, 18);
-        reduce(88, Lexer.Tipo.EQ, 40);
-        reduce(88, Lexer.Tipo.FECHA_PAR, 40);
-        reduce(88, Lexer.Tipo.GE, 40);
-        reduce(88, Lexer.Tipo.GT, 40);
-        reduce(88, Lexer.Tipo.LE, 40);
-        reduce(88, Lexer.Tipo.LT, 40);
-        reduce(88, Lexer.Tipo.MAIS, 40);
-        reduce(88, Lexer.Tipo.MENOS, 40);
-        reduce(88, Lexer.Tipo.NE, 40);
-        reduce(88, Lexer.Tipo.PONTO_VIRG, 40);
-        reduce(89, Lexer.Tipo.DOUBLE, 14);
-        reduce(89, Lexer.Tipo.FECHA_CHAVE, 14);
-        reduce(89, Lexer.Tipo.ID, 14);
-        reduce(89, Lexer.Tipo.IF, 14);
-        reduce(89, Lexer.Tipo.PRINT, 14);
-        reduce(89, Lexer.Tipo.WHILE, 14);
+        reduce(87, 18); // PFALSA -> lambda
+
+        reduce(88, 40); // MAIS_FATORES -> OP_MUL FATOR MAIS_FATORES
+        reduce(89, 14); // CMD_COND -> while ( CONDICAO ) { CMDS }
         shift(90, Lexer.Tipo.ABRE_CHAVE, 92);
-        reduce(91, Lexer.Tipo.DOUBLE, 13);
-        reduce(91, Lexer.Tipo.FECHA_CHAVE, 13);
-        reduce(91, Lexer.Tipo.ID, 13);
-        reduce(91, Lexer.Tipo.IF, 13);
-        reduce(91, Lexer.Tipo.PRINT, 13);
-        reduce(91, Lexer.Tipo.WHILE, 13);
+        reduce(91, 13); // CMD_COND -> if ( CONDICAO ) { CMDS } PFALSA
+
+        // Estado 92: Corpo do bloco else
         shift(92, Lexer.Tipo.DOUBLE, 17);
-        reduce(92, Lexer.Tipo.FECHA_CHAVE, 11);
-        shift(92, Lexer.Tipo.ID, 21);
         shift(92, Lexer.Tipo.IF, 18);
-        shift(92, Lexer.Tipo.PRINT, 20);
         shift(92, Lexer.Tipo.WHILE, 19);
+        shift(92, Lexer.Tipo.PRINT, 20);
+        shift(92, Lexer.Tipo.ID, 21);
+        reduce(92, 11); // CMDS -> lambda
+
         shift(93, Lexer.Tipo.FECHA_CHAVE, 94);
-        reduce(94, Lexer.Tipo.DOUBLE, 17);
-        reduce(94, Lexer.Tipo.FECHA_CHAVE, 17);
-        reduce(94, Lexer.Tipo.ID, 17);
-        reduce(94, Lexer.Tipo.IF, 17);
-        reduce(94, Lexer.Tipo.PRINT, 17);
-        reduce(94, Lexer.Tipo.WHILE, 17);
+        reduce(94, 17); // PFALSA -> else { CMDS }
     }
 
+    // ==========================================================================
+    // 5. TABELA GOTO DOS NAO-TERMINAIS
+    // ==========================================================================
     private void carregarGotoPredefinido() {
         desvio(0, ParserSLR.NaoTerminal.PROG, 2);
         desvio(16, ParserSLR.NaoTerminal.CMD, 27);

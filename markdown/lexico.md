@@ -120,41 +120,41 @@ O Lexer opera como uma máquina de estados finitos que avança caractere a carac
 
 ### 4.2 Reconhecimento de `lerDouble()`
 - Na gramática, `lerDouble()` é uma chamada atômica reservada permitida apenas à direita de uma atribuição (`EXP_IDENT -> lerDouble()`).
-- **Solução do AFD:** Ao encontrar o lexema `lerDouble`, o scanner verifica a presença imediata dos parênteses `()` (ignorando eventuais espaços inline), consome a assinatura completa e emite `LER_DOUBLE`.
+- **Solução do AFD:** Ao encontrar o lexema `lerDouble`, o scanner verifica com `fonte.startsWith("()", atual)` a presença imediata dos parênteses `()`, avança 2 caracteres e emite o token `Tipo.LER_DOUBLE`.
 
 ### 4.3 Tratamento de Números (`NUMERO_REAL`)
 - A gramática opera exclusivamente sobre o tipo `double`.
-- Literais inteiros como `10` ou `0` e reais como `3.14` são ambos convertidos para `TokenTipo.NUMERO_REAL`.
-- O valor `Double.parseDouble(lexema)` é armazenado no atributo `literal` do `Token`, permitindo que o gerador de código objeto emita diretamente constantes numéricas (`CRCT 10.0` ou `CRCT 10`).
+- Literais inteiros como `10` ou `0` e reais como `3.14` são ambos categorizados como `Lexer.Tipo.NUMERO_REAL`.
+- No gerador de código, o lexema é convertido via `Double.parseDouble(lexema)` para emitir a instrução `CRCT`.
 
 ### 4.4 Tratamento de Comentários
 - **Comentários de linha:** Iniciados por `//` até a quebra de linha `\n`.
 - **Comentários de bloco:** Iniciados por `/*` e encerrados por `*/`.
-- Se um comentário de bloco for aberto e o arquivo terminar sem seu fechamento, é disparado `LexicalException("Comentario de bloco nao fechado")`.
+- Se um comentário de bloco for aberto e o arquivo terminar sem seu fechamento, é disparado `LexicalException("Comentario de bloco nao fechado", linIni, colIni)`.
 
 ---
 
 ## 5. Estrutura de Classes do Módulo
 
-O pacote `compilador.lexico` contém os seguintes arquivos:
+Toda a análise léxica está encapsulada em [Lexer.java](file:///c:/Users/Muril/compilador-java/src/compilador/Lexer.java):
 
-- [TokenTipo.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/TokenTipo.java): Enum com todas as categorias sintáticas e representações formais.
-- [Token.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/Token.java): Classe de dados imutável armazenando `tipo`, `lexema`, `literal`, `linha` e `coluna`.
-- [Lexer.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/Lexer.java): Motor do AFD com suporte a `proximoToken()` e lookahead de 1 token (`espiarToken()`).
-- [LexicalException.java](file:///c:/Users/Muril/compilador-java/src/compilador/lexico/LexicalException.java): Exceção que carrega as coordenadas de erro léxico.
+- `Lexer.Tipo`: Enum com todas as 33 categorias terminais da gramática mais `EOF`.
+- `Lexer.Token`: Classe imutável armazenando `tipo`, `lexema`, `linha` e `coluna`.
+- `Lexer`: Motor do AFD com `fromFile()`, `tokenizarTodos()` e `proximoToken()`.
+- `Lexer.LexicalException`: Exceção que reporta linha, coluna e motivo do erro léxico.
 
 ---
 
 ## 6. Como Executar e Validar o Léxico
 
-A validação léxica pode ser inspecionada executando o ponto de entrada principal:
+A validação léxica pode ser executada pelo ponto de entrada principal:
 
 ```powershell
-java -cp bin compilador.MainCompilador correto.java.txt
+java -cp bin compilador.MainCompilador exemplos/correto.java.txt
 ```
 
 Saída da etapa léxica:
 ```text
-[1/2] Executando Analisador Lexico Puro...
+[1/4] Executando Analisador Lexico...
       -> Lexico concluido com SUCESSO! Total de tokens: 87
 ```

@@ -222,9 +222,8 @@ Como o compilador traduz o código em uma única passada durante a redução sin
 
 ---
 
-## 6. Estrutura Proposta para a Parte 2
+## 6. Estrutura da Parte 2 (`compilador.maquina`)
 
-A implementação da Parte 2 (Interpretador da Máquina Hipotética) será organizada no pacote `compilador.maquina`:
-- `Instrucao.java`: Modelo imutável de instrução contendo mnemônico e operando numérico opcional.
-- `MaquinaHipotetica.java`: O simulador da CPU com memória `M[]`, registradores `i` e `s`, e suporte a I/O padrão.
-- `MainMaquina.java`: Ponto de entrada que lê o arquivo `codigo.objeto.txt` e executa no terminal.
+A implementação da Parte 2 (Interpretador da Máquina Hipotética) está organizada no pacote `compilador.maquina`:
+- [MaquinaHipotetica.java](file:///c:/Users/Muril/compilador-java/src/compilador/maquina/MaquinaHipotetica.java): O simulador da CPU com memória `M[]`, registradores `i` e `s`, classe interna `InstrucaoVM`, e suporte a I/O padrão (`LEIT` / `IMPR`).
+- [MainMaquina.java](file:///c:/Users/Muril/compilador-java/src/compilador/maquina/MainMaquina.java): Ponto de entrada que lê o arquivo `codigo.objeto.txt` e executa no terminal (com suporte à flag `--trace`).

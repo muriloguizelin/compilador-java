@@ -281,7 +281,7 @@ Código objeto esperado a ser gerado:
 4:  CRVL 0
 5:  CRCT 0
 6:  CPMA
-7:  DSVF 26
+7:  DSVF 32
 8:  LEIT
 9:  ARMZ 1
 10: LEIT
@@ -318,23 +318,27 @@ Código objeto esperado a ser gerado:
 
 ```text
 compilador-java/
+├── README.md                    # Instruções de compilação e execução
 ├── descricao.txt                # Enunciado oficial do trabalho
 ├── lalg-java.txt                # Gramática original
-├── correto.java.txt             # Código de teste de entrada
 ├── codigo.objeto.txt            # Código objeto gerado para a Máquina Hipotética
-├── SPECS.md                     # Especificações técnicas do projeto
-├── GUIA_DEFESA_ORAL.md          # Guia preparatório completo para a defesa com o professor
-├── GUIA_ESTUDOS_COMPLETO.md     # Roteiro didático aprofundado
-├── src/
-│   └── compilador/
-│       ├── MainCompilador.java      # Ponto de entrada do Compilador (Parte 1)
-│       ├── Lexer.java               # Analisador Léxico puro + Token + TokenTipo + LexicalException
-│       ├── ParserSLR.java           # Analisador Sintático Ascendente SLR(1) + Gramática + Nós CST + SyntacticException
-│       ├── AnalisadorSemantico.java # Analisador Semântico + Tabela de Símbolos + SemanticException
-│       ├── TradutorCodigo.java      # Tradutor para Máquina Hipotética + Backpatching + Instrução
-│       └── maquina/
-│           ├── MainMaquina.java         # Ponto de entrada da Máquina Hipotética (Parte 2)
-│           └── MaquinaHipotetica.java   # Interpretador VM (Pilha M[], registradores i e s)
+├── exemplos/
+│   ├── correto.java.txt         # Código de teste principal de entrada
+│   └── erro_*.java.txt          # Testes de erros léxico, sintático, semântico e divisão por zero
+├── markdown/
+│   ├── SPECS.md                 # Especificações técnicas do projeto
+│   ├── GUIA_DEFESA_ORAL.md      # Guia preparatório direto para a defesa com o professor
+│   └── GUIA_ESTUDOS_COMPLETO.md # Roteiro didático aprofundado
+└── src/compilador/
+    ├── MainCompilador.java      # Ponto de entrada do Compilador (Parte 1)
+    ├── Lexer.java               # Analisador Léxico puro + Token + Tipo + LexicalException
+    ├── ParserSLR.java           # Motor do Analisador Sintático Ascendente SLR(1) + NoSintatico
+    ├── TabelaSLR.java           # Gramática, Conjuntos FIRST/FOLLOW e Tabelas ACTION e GOTO
+    ├── AnalisadorSemantico.java # Analisador Semântico + Tabela de Símbolos + SemanticException
+    ├── TradutorCodigo.java      # Tradutor para Máquina Hipotética + Backpatching + Instrucao
+    └── maquina/
+        ├── MainMaquina.java         # Ponto de entrada da Máquina Hipotética (Parte 2)
+        └── MaquinaHipotetica.java   # Interpretador VM (Pilha M[], registradores i e s)
 ```
 
 ---

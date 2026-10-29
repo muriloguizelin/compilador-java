@@ -1,12 +1,14 @@
 package compilador;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Analisador Léxico Puro para Java Simplificado (lalg-java).
- * Reconhece palavras-chave, identificadores, números reais, operadores e delimitadores.
+ * Analisador Lexico Puro para Java Simplificado (lalg-java).
+ * Reconhece palavras-chave, identificadores, numeros reais, operadores e delimitadores.
  */
 public class Lexer {
 
@@ -33,11 +35,6 @@ public class Lexer {
             this.linha = linha;
             this.coluna = coluna;
         }
-
-        public Tipo getTipo() { return tipo; }
-        public String getLexema() { return lexema; }
-        public int getLinha() { return linha; }
-        public int getColuna() { return coluna; }
 
         @Override
         public String toString() {
@@ -80,13 +77,8 @@ public class Lexer {
     }
 
     public static Lexer fromFile(String caminho) throws IOException {
-        File arq = new File(caminho);
-        if (!arq.exists()) throw new IOException("Arquivo não encontrado: " + caminho);
-        byte[] bytes = new byte[(int) arq.length()];
-        try (FileInputStream fis = new FileInputStream(arq)) {
-            int lidos = fis.read(bytes);
-            return new Lexer(new String(bytes, 0, Math.max(0, lidos), StandardCharsets.UTF_8));
-        }
+        String conteudo = Files.readString(Path.of(caminho), StandardCharsets.UTF_8);
+        return new Lexer(conteudo);
     }
 
     public List<Token> tokenizarTodos() {
@@ -110,7 +102,7 @@ public class Lexer {
         int colTok = coluna;
         char c = avancar();
 
-        // 1. Identificadores e palavras-chave
+        // 1. Identificadores, palavras reservadas e comandos especiais
         if (Character.isLetter(c) || c == '_') {
             int inicio = atual - 1;
             while (atual < fonte.length() && (Character.isLetterOrDigit(fonte.charAt(atual)) || fonte.charAt(atual) == '_')) {
@@ -118,25 +110,22 @@ public class Lexer {
             }
             String lexema = fonte.substring(inicio, atual);
 
-            // Casos especiais exigidos pela gramática: System.out.println e lerDouble()
+            // Casos especiais exigidos pela gramatica: System.out.println e lerDouble()
             if ("System".equals(lexema) && fonte.startsWith(".out.println", atual)) {
-                for (int i = 0; i < 12; i++) avancar();
+                for (int i = 0; i < 12; i++) avancar(); // consome ".out.println" (12 caracteres)
                 return new Token(Tipo.PRINT, "System.out.println", linTok, colTok);
             }
-            if ("lerDouble".equals(lexema)) {
-                int p = atual;
-                while (p < fonte.length() && (fonte.charAt(p) == ' ' || fonte.charAt(p) == '\t')) p++;
-                if (p + 1 < fonte.length() && fonte.charAt(p) == '(' && fonte.charAt(p + 1) == ')') {
-                    while (atual < p + 2) avancar();
-                    return new Token(Tipo.LER_DOUBLE, "lerDouble()", linTok, colTok);
-                }
+            if ("lerDouble".equals(lexema) && fonte.startsWith("()", atual)) {
+                avancar(); // consome '('
+                avancar(); // consome ')'
+                return new Token(Tipo.LER_DOUBLE, "lerDouble()", linTok, colTok);
             }
 
             Tipo tipo = RESERVADAS.getOrDefault(lexema, Tipo.ID);
             return new Token(tipo, lexema, linTok, colTok);
         }
 
-        // 2. Números (inteiros ou reais)
+        // 2. Numeros (inteiros ou reais)
         if (Character.isDigit(c)) {
             int inicio = atual - 1;
             while (atual < fonte.length() && Character.isDigit(fonte.charAt(atual))) avancar();
@@ -166,7 +155,7 @@ public class Lexer {
                 return new Token(Tipo.ATRIB, "=", linTok, colTok);
             case '!':
                 if (match('=')) return new Token(Tipo.NE, "!=", linTok, colTok);
-                throw new LexicalException("Esperado '=' após '!'", linTok, colTok);
+                throw new LexicalException("Esperado '=' apos '!'", linTok, colTok);
             case '<':
                 if (match('=')) return new Token(Tipo.LE, "<=", linTok, colTok);
                 return new Token(Tipo.LT, "<", linTok, colTok);
@@ -198,11 +187,15 @@ public class Lexer {
             } else if (c == '/' && atual + 1 < fonte.length() && fonte.charAt(atual + 1) == '/') {
                 while (atual < fonte.length() && fonte.charAt(atual) != '\n') avancar();
             } else if (c == '/' && atual + 1 < fonte.length() && fonte.charAt(atual + 1) == '*') {
-                avancar(); avancar();
+                int linIni = linha, colIni = coluna;
+                avancar(); avancar(); // consome '/*'
                 while (atual + 1 < fonte.length() && !(fonte.charAt(atual) == '*' && fonte.charAt(atual + 1) == '/')) {
                     avancar();
                 }
-                if (atual + 1 < fonte.length()) { avancar(); avancar(); }
+                if (atual + 1 >= fonte.length()) {
+                    throw new LexicalException("Comentario de bloco nao fechado", linIni, colIni);
+                }
+                avancar(); avancar(); // consome '*/'
             } else {
                 break;
             }

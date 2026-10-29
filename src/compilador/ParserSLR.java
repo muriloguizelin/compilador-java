@@ -4,7 +4,7 @@ import java.util.*;
 
 /**
  * Analisador Sintatico Ascendente SLR(1) (Shift-Reduce).
- * Executa o automato com pilha consultando a tabela em TabelaSLR.
+ * Executa o automato com pilha consultando as tabelas ACTION e GOTO em TabelaSLR.
  */
 public class ParserSLR {
 
@@ -23,9 +23,6 @@ public class ParserSLR {
         public NoSintatico(Lexer.Token token) { this.nt = null; this.token = token; }
 
         public boolean ehFolha() { return token != null; }
-        public NaoTerminal getNaoTerminal() { return nt; }
-        public Lexer.Token getToken() { return token; }
-        public List<NoSintatico> getFilhos() { return filhos; }
         public NoSintatico getFilho(int i) { return (i >= 0 && i < filhos.size()) ? filhos.get(i) : null; }
         public int getQtdFilhos() { return filhos.size(); }
     }
@@ -43,27 +40,26 @@ public class ParserSLR {
         public final NoSintatico raiz;
         public final int passos, shifts, reduces;
         public ResultadoParser(NoSintatico raiz, int passos, int shifts, int reduces) {
-            this.raiz = raiz; this.passos = passos; this.shifts = shifts; this.reduces = reduces;
+            this.raiz = raiz;
+            this.passos = passos;
+            this.shifts = shifts;
+            this.reduces = reduces;
         }
     }
 
-    private final TabelaSLR tabela;
+    private final TabelaSLR tabela = new TabelaSLR();
     private boolean modoDebug = false;
 
-    public ParserSLR() {
-        this(new TabelaSLR());
-    }
-
-    public ParserSLR(TabelaSLR tabela) {
-        this.tabela = tabela;
-    }
-
     public void setModoDepuracao(boolean debug) { this.modoDebug = debug; }
-    public TabelaSLR getTabela() { return tabela; }
 
     public ResultadoParser analisar(List<Lexer.Token> tokens) {
+        if (modoDebug) {
+            tabela.imprimirFirstFollow();
+        }
+
+        // Pilha alternada: [estado_0, NoSintatico_1, estado_1, NoSintatico_2, estado_2, ...]
         Deque<Object> pilha = new ArrayDeque<>();
-        pilha.push(0); // Estado inicial
+        pilha.push(0); // Estado inicial do automato LR(0)
 
         int ip = 0;
         int passos = 0, shifts = 0, reduces = 0;
@@ -71,7 +67,7 @@ public class ParserSLR {
         while (true) {
             passos++;
             int s = (Integer) pilha.peek();
-            Lexer.Token a = (ip < tokens.size()) ? tokens.get(ip) : new Lexer.Token(Lexer.Tipo.EOF, "$", 0, 0);
+            Lexer.Token a = tokens.get(ip);
 
             TabelaSLR.Acao acao = tabela.obterAcao(s, a.tipo);
 
@@ -82,39 +78,39 @@ public class ParserSLR {
             switch (acao.tipo) {
                 case SHIFT:
                     shifts++;
-                    pilha.push(new NoSintatico(a));
-                    pilha.push(acao.valor);
-                    ip++;
+                    pilha.push(new NoSintatico(a)); // empilha simbolo terminal (folha)
+                    pilha.push(acao.valor);         // empilha novo estado
+                    ip++;                           // avanca para o proximo token da fita
                     break;
 
                 case REDUCE:
                     reduces++;
                     TabelaSLR.Regra r = acao.regra;
-                    List<NoSintatico> filhos = new ArrayList<>();
+                    NoSintatico no = new NoSintatico(r.lhs);
+
+                    // Desempilha 2 * |rhs| elementos (para cada simbolo da regra, remove o estado e o no)
                     for (int k = 0; k < r.rhs.length; k++) {
                         pilha.pop(); // desempilha estado
-                        filhos.add(0, (NoSintatico) pilha.pop()); // desempilha no na ordem correta
+                        no.filhos.add(0, (NoSintatico) pilha.pop()); // insere no inicio para manter ordem esquerda->direita
                     }
-                    NoSintatico no = new NoSintatico(r.lhs);
-                    no.filhos.addAll(filhos);
 
                     int topoEstado = (Integer) pilha.peek();
-                    Integer prox = tabela.obterGoto(topoEstado, r.lhs);
-                    if (prox == null) {
-                        throw new SyntacticException("Desvio (GOTO) indefinido para nao-terminal " + r.lhs, a.linha, a.coluna);
-                    }
-                    pilha.push(no);
-                    pilha.push(prox);
+                    Integer proxEstado = tabela.obterGoto(topoEstado, r.lhs);
+                    pilha.push(no);         // empilha o nao-terminal reduzido
+                    pilha.push(proxEstado); // empilha o estado destino da tabela GOTO
                     break;
 
                 case ACCEPT:
-                    pilha.pop(); // desempilha estado final
-                    NoSintatico noProg = (NoSintatico) pilha.pop(); // desempilha o no PROG
+                    pilha.pop(); // desempilha estado final (2)
+                    NoSintatico noProg = (NoSintatico) pilha.pop(); // desempilha a raiz PROG
                     return new ResultadoParser(noProg, passos, shifts, reduces);
 
                 case ERROR:
                 default:
-                    throw new SyntacticException("Token inesperado '" + a.lexema + "' (" + a.tipo + ")", a.linha, a.coluna);
+                    Set<Lexer.Tipo> esperados = tabela.obterTokensEsperados(s);
+                    throw new SyntacticException(
+                            "Token inesperado '" + a.lexema + "' (" + a.tipo + "). Esperado: " + esperados,
+                            a.linha, a.coluna);
             }
         }
     }

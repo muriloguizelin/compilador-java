@@ -5,11 +5,11 @@ import java.util.List;
 
 /**
  * Ponto de entrada do Compilador Java Ascendente (Parte 1).
- * Executa o pipeline: Léxico -> Sintático SLR(1) -> Semântico -> Gerador de Código.
+ * Executa o pipeline: Lexico -> Sintatico SLR(1) -> Semantico -> Gerador de Codigo.
  */
 public class MainCompilador {
     public static void main(String[] args) {
-        String caminhoFonte = new File("correto.java.txt").exists() ? "correto.java.txt" : "exemplos/correto.java.txt";
+        String caminhoFonte = "exemplos/correto.java.txt";
         String caminhoObjeto = "codigo.objeto.txt";
         boolean modoDebug = false;
 
@@ -19,7 +19,7 @@ public class MainCompilador {
         }
 
         System.out.println("==========================================================================");
-        System.out.println("                    COMPILADOR JAVA SIMPLIFICADO           ");
+        System.out.println("                    COMPILADOR JAVA SIMPLIFICADO                          ");
         System.out.println("==========================================================================");
         System.out.println("Arquivo Fonte  : " + new File(caminhoFonte).getAbsolutePath());
         System.out.println("Arquivo Objeto : " + new File(caminhoObjeto).getAbsolutePath());

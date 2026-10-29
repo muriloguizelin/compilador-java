@@ -3,8 +3,8 @@ package compilador;
 import java.util.*;
 
 /**
- * Analisador Semântico da linguagem lalg-java.
- * Responsável pela validação de declarações, escopo e atribuição de endereços de memória.
+ * Analisador Semantico da linguagem lalg-java.
+ * Responsavel pela validacao de declaracao previa, unicidade de escopo e enderecamento de memoria.
  */
 public class AnalisadorSemantico {
 
@@ -21,10 +21,6 @@ public class AnalisadorSemantico {
             this.linha = linha;
             this.coluna = coluna;
         }
-
-        public String getNome() { return nome; }
-        public String getTipo() { return tipo; }
-        public int getEndereco() { return endereco; }
     }
 
     public static class SemanticException extends RuntimeException {
@@ -61,8 +57,13 @@ public class AnalisadorSemantico {
             return s;
         }
 
-        public int getTotalVariaveis() { return variaveis.size(); }
-        public Collection<Simbolo> getSimbolos() { return variaveis.values(); }
+        public int obterEndereco(String nome) {
+            return variaveis.get(nome).endereco;
+        }
+
+        public int getTotalVariaveis() {
+            return variaveis.size();
+        }
 
         public void imprimirTabela() {
             System.out.println("--------------------------------------------------------------------------");
@@ -82,27 +83,38 @@ public class AnalisadorSemantico {
     private final TabelaSimbolos tabela = new TabelaSimbolos();
 
     public TabelaSimbolos analisar(ParserSLR.NoSintatico raiz) {
-        if (raiz == null) throw new IllegalArgumentException("Raiz sintática nula");
-
-        ParserSLR.NoSintatico noCmds = encontrarNo(raiz, ParserSLR.NaoTerminal.CMDS);
-        if (noCmds != null) {
-            processarDeclaracoes(noCmds);
-            validarUsosVariaveis(noCmds);
-        }
+        percorrer(raiz);
         return tabela;
     }
 
-    private void processarDeclaracoes(ParserSLR.NoSintatico no) {
+    // Percorre a arvore sintatica em pre-ordem, garantindo que toda variavel seja declarada ANTES de ser usada
+    private void percorrer(ParserSLR.NoSintatico no) {
         if (no == null) return;
-        if (no.getNaoTerminal() == ParserSLR.NaoTerminal.DC) {
-            // DC -> VAR MAIS_CMDS -> TIPO VARS
-            ParserSLR.NoSintatico noVar = no.getFilho(0);
-            if (noVar != null && noVar.getNaoTerminal() == ParserSLR.NaoTerminal.VAR) {
-                cadastrarVariaveis(noVar.getFilho(1));
+
+        // 1. Declaracao de variaveis: VAR -> TIPO VARS
+        if (no.nt == ParserSLR.NaoTerminal.VAR) {
+            cadastrarVariaveis(no.getFilho(1));
+            return;
+        }
+
+        // 2. Uso no lado esquerdo de atribuicao: CMD -> id RESTO_IDENT
+        if (no.nt == ParserSLR.NaoTerminal.CMD && no.getQtdFilhos() >= 2) {
+            ParserSLR.NoSintatico f0 = no.getFilho(0);
+            if (f0.ehFolha() && f0.token.tipo == Lexer.Tipo.ID) {
+                tabela.verificarDeclarada(f0.token.lexema, f0.token.linha, f0.token.coluna);
             }
         }
-        for (ParserSLR.NoSintatico f : no.getFilhos()) {
-            processarDeclaracoes(f);
+
+        // 3. Uso em expressao ou condicao: FATOR -> id
+        if (no.nt == ParserSLR.NaoTerminal.FATOR && no.getQtdFilhos() == 1) {
+            ParserSLR.NoSintatico f0 = no.getFilho(0);
+            if (f0.ehFolha() && f0.token.tipo == Lexer.Tipo.ID) {
+                tabela.verificarDeclarada(f0.token.lexema, f0.token.linha, f0.token.coluna);
+            }
+        }
+
+        for (ParserSLR.NoSintatico filho : no.filhos) {
+            percorrer(filho);
         }
     }
 
@@ -110,50 +122,14 @@ public class AnalisadorSemantico {
         if (noVars == null) return;
         // VARS -> id MAIS_VAR
         ParserSLR.NoSintatico noId = noVars.getFilho(0);
-        if (noId != null && noId.ehFolha() && noId.getToken().getTipo() == Lexer.Tipo.ID) {
-            Lexer.Token tok = noId.getToken();
-            tabela.inserir(tok.getLexema(), "double", tok.getLinha(), tok.getColuna());
+        if (noId != null && noId.ehFolha() && noId.token.tipo == Lexer.Tipo.ID) {
+            Lexer.Token tok = noId.token;
+            tabela.inserir(tok.lexema, "double", tok.linha, tok.coluna);
         }
         ParserSLR.NoSintatico noMaisVar = noVars.getFilho(1);
         if (noMaisVar != null && noMaisVar.getQtdFilhos() >= 2) {
             // MAIS_VAR -> , VARS
             cadastrarVariaveis(noMaisVar.getFilho(1));
         }
-    }
-
-    private void validarUsosVariaveis(ParserSLR.NoSintatico no) {
-        if (no == null) return;
-
-        // 1. Atribuição: CMD -> id RESTO_IDENT
-        if (no.getNaoTerminal() == ParserSLR.NaoTerminal.CMD && no.getQtdFilhos() >= 2) {
-            ParserSLR.NoSintatico f0 = no.getFilho(0);
-            if (f0.ehFolha() && f0.getToken().getTipo() == Lexer.Tipo.ID) {
-                Lexer.Token tok = f0.getToken();
-                tabela.verificarDeclarada(tok.getLexema(), tok.getLinha(), tok.getColuna());
-            }
-        }
-
-        // 2. Uso em Expressão: FATOR -> id
-        if (no.getNaoTerminal() == ParserSLR.NaoTerminal.FATOR && no.getQtdFilhos() == 1) {
-            ParserSLR.NoSintatico f0 = no.getFilho(0);
-            if (f0.ehFolha() && f0.getToken().getTipo() == Lexer.Tipo.ID) {
-                Lexer.Token tok = f0.getToken();
-                tabela.verificarDeclarada(tok.getLexema(), tok.getLinha(), tok.getColuna());
-            }
-        }
-
-        for (ParserSLR.NoSintatico f : no.getFilhos()) {
-            validarUsosVariaveis(f);
-        }
-    }
-
-    private ParserSLR.NoSintatico encontrarNo(ParserSLR.NoSintatico atual, ParserSLR.NaoTerminal nt) {
-        if (atual == null) return null;
-        if (atual.getNaoTerminal() == nt) return atual;
-        for (ParserSLR.NoSintatico f : atual.getFilhos()) {
-            ParserSLR.NoSintatico achou = encontrarNo(f, nt);
-            if (achou != null) return achou;
-        }
-        return null;
     }
 }

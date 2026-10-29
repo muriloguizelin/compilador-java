@@ -12,7 +12,7 @@ public class MainMaquina {
         boolean modoTrace = false;
 
         for (String arg : args) {
-            if ("--debug".equalsIgnoreCase(arg) || "-d".equalsIgnoreCase(arg) || "-v".equalsIgnoreCase(arg) || "--trace".equalsIgnoreCase(arg)) {
+            if ("--trace".equalsIgnoreCase(arg) || "--debug".equalsIgnoreCase(arg)) {
                 modoTrace = true;
             } else if (!arg.startsWith("-")) {
                 caminhoArquivo = arg;
