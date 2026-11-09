@@ -120,19 +120,19 @@ A Máquina Hipotética funciona com dois ponteiros principais:
 | :--- | :--- | :--- |
 | `INPP` | Inicializa os ponteiros (`s = -1`, `i = 0`). | Deve ser SEMPRE a primeira instrução executada. |
 | `ALME m` | Reserva `m` posições na pilha de dados (`s = s + m`). | Aloca o espaço de memória para as variáveis declaradas no programa. |
-| `CRCT k` | Empilha o valor constante `k` (`M[++s] = k`). | Sempre que um número literal (ex: `10`) aparece no código fonte. |
-| `CRVL n` | Empilha o valor da variável que está no endereço `n` (`M[++s] = M[n]`). | Sempre que o valor de uma variável é lido em uma expressão ou condição. |
-| `ARMZ n` | Desempilha o valor do topo e salva na variável `n` (`M[n] = M[s--]`). | Gerado no final de um comando de atribuição (`id = ...`). |
+| `CRCT k` | Empilha o valor constante `k` (`s++; M[s] = k`). | Sempre que um número literal (ex: `10`) aparece no código fonte. |
+| `CRVL n` | Empilha o valor da variável que está no endereço `n` (`s++; M[s] = M[n]`). | Sempre que o valor de uma variável é lido em uma expressão ou condição. |
+| `ARMZ n` | Desempilha o valor do topo e salva na variável `n` (`M[n] = M[s]; s--`). | Gerado no final de um comando de atribuição (`id = ...`). |
 | `SOMA` | `M[s-1] = M[s-1] + M[s]; s--;` | Avalia o operador binário `+`. |
 | `SUBT` | `M[s-1] = M[s-1] - M[s]; s--;` | Avalia o operador binário `-`. |
 | `MULT` | `M[s-1] = M[s-1] * M[s]; s--;` | Avalia o operador binário `*`. |
 | `DIVI` | `M[s-1] = M[s-1] / M[s]; s--;` | Avalia o operador binário `/`. |
 | `INVE` | `M[s] = -M[s];` | Inverte o sinal do topo quando há operador unário `-`. |
 | `CPMA` | `M[s-1] = (M[s-1] > M[s] ? 1 : 0); s--;` | Compara se `topo-1 > topo`. Deixa `1.0` (verdadeiro) ou `0.0` (falso) no topo. |
-| `DSVF p` | Se `M[s--] == 0`, pula para a linha `p` (`i = p`). | Usado em `if` e `while` para pular o bloco caso a condição seja falsa. |
+| `DSVF p` | Se `M[s] == 0`, pula para a linha `p` (`i = p`); em seguida `s--`. | Usado em `if` e `while` para pular o bloco caso a condição seja falsa. |
 | `DSVI p` | Pulo incondicional para a linha `p` (`i = p`). | Usado no final do bloco `if` (para pular o `else`) e no final do `while` (para voltar ao teste). |
-| `LEIT` | Lê do teclado e empilha (`M[++s] = lerDouble()`). | Gerado exclusivamente para a instrução `lerDouble()`. |
-| `IMPR` | Desempilha e imprime na tela (`print(M[s--])`). | Gerado para `System.out.println(...)`. |
+| `LEIT` | Lê do teclado e empilha (`s++; M[s] = lerDouble()`). | Gerado exclusivamente para a instrução `lerDouble()`. |
+| `IMPR` | Desempilha e imprime na tela (`val = M[s]; s--; print(val)`). | Gerado para `System.out.println(...)`. |
 | `DESM m` | Libera `m` posições de memória (`s = s - m`). | Executado ao final do programa para desalocar as variáveis locais. |
 | `PARA` | Encerra a execução da máquina virtual. | Última linha executada do programa. |
 
@@ -247,8 +247,8 @@ System.out.println(c);
 
 ## 4. As Perguntas que o Professor VAI te Fazer na Apresentação
 
-1. **"Por que o analisador ascendente desempilha $2 \times |\text{tamanho da regra}|$ elementos?"**  
-   *Resposta:* "Porque para cada símbolo gramatical na pilha existe também um estado empilhado logo acima dele. Logo, para desempilhar $k$ símbolos da regra $A \rightarrow \beta$, precisamos remover $2k$ elementos (o símbolo e o seu respectivo estado)."
+1. **"Por que o analisador ascendente usa duas pilhas sincronizadas (`pilhaDeEstados` e `pilhaDeNos`) e desempilha `regra.ladoDireito.length` elementos?"**  
+   *Resposta:* "Porque para cada símbolo gramatical empilhado em `pilhaDeNos` existe também um estado empilhado em `pilhaDeEstados`. Logo, para reduzir $k$ símbolos da regra (`ladoDireito.length`), desempilhamos $k$ estados de `pilhaDeEstados` e $k$ nós filhos de `pilhaDeNos` (inserindo no índice `0` para manter a ordem esquerda $\rightarrow$ direita)."
 
 2. **"Como o parser sabe quando fazer Shift ou Reduce?"**  
    *Resposta:* "Ele consulta a tabela `ACTION[estado_topo, token_atual]`. Se contiver `Shift(s')`, ele consome o token e empilha o novo estado. Se contiver `Reduce(r)`, ele aplica a redução da regra $r$ usando os conjuntos `FOLLOW` pré-calculados do não-terminal."

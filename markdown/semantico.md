@@ -57,10 +57,10 @@ Cada entrada na tabela armazena:
 
 ### 2.2 Estrutura da Tabela (`AnalisadorSemantico.TabelaSimbolos`)
 
-A tabela é implementada internamente sobre um `LinkedHashMap<String, Simbolo>` com inserção sequencial:
-- `inserir(nome, tipo, linha, coluna)`: Insere nova variável com endereço igual a `variaveis.size()`. Lança `SemanticException` caso o nome já exista.
-- `verificarDeclarada(nome, linha, coluna)`: Retorna o símbolo ou dispara erro semântico de variável não declarada.
-- `obterEndereco(nome)`: Retorna o endereço de memória ($0 \dots m-1$) usado pelo `TradutorCodigo` para emitir `CRVL` e `ARMZ`.
+A tabela é implementada internamente sobre um `LinkedHashMap<String, Simbolo>` (`variaveisDeclaradas`) com inserção sequencial:
+- `inserir(tokenVariavel)`: Insere nova variável com endereço igual a `variaveisDeclaradas.size()`. Lança `SemanticException` caso o nome já exista.
+- `verificarDeclarada(tokenVariavel)`: Verifica se a variável já consta na tabela ou dispara erro semântico de variável não declarada.
+- `obterEndereco(nomeVariavel)`: Retorna o endereço de memória ($0 \dots m-1$) usado pelo `TradutorCodigo` para emitir `CRVL` e `ARMZ`.
 - `getTotalVariaveis()`: Retorna a quantidade total de variáveis alocadas (necessário para as instruções `ALME` e `DESM`).
 
 ---
@@ -131,13 +131,12 @@ Mapeamento resultante na Tabela de Símbolos:
 
 ## 5. Travessia da Árvore Sintática Concreta (CST) em Pré-Ordem
 
-Após o `ParserSLR` construir a árvore sintática (`NoSintatico`), o `AnalisadorSemantico` percorre a árvore em **pré-ordem** (`percorrer(NoSintatico no)`), garantindo que toda variável seja declarada **antes** de ser utilizada:
+Após o `ParserSLR` construir a árvore sintática (`NoSintatico`), o `AnalisadorSemantico` percorre o bloco `<CMDS>` (`noRaizProg.getFilho(15)`) em **pré-ordem** (`percorrerComandos(NoSintatico no)`), garantindo que toda variável seja declarada **antes** de ser utilizada:
 
 | Nó Visitado na CST | Ação Semântica Executada |
 | :--- | :--- |
-| `VAR -> TIPO VARS` | Percorre recursivamente `VARS` e `MAIS_VAR`, inserindo cada `id` na Tabela de Símbolos com o próximo endereço livre ($0, 1, \dots$) e verificando duplicidade. |
-| `CMD -> id RESTO_IDENT` | Verifica via `tabela.verificarDeclarada(...)` se o `id` à esquerda da atribuição já foi declarado. |
-| `FATOR -> id` | Verifica via `tabela.verificarDeclarada(...)` se o `id` lido na expressão/condição já foi declarado. |
+| `no.naoTerminal == VAR` | Chama `cadastrarVariaveis(no)`, que percorre o bloco `VAR` inserindo cada token `ID` na Tabela de Símbolos com o próximo endereço livre ($0, 1, \dots$) e verificando duplicidade. |
+| `no.getTipoToken() == ID` (fora de `VAR`) | Qualquer token `ID` encontrado nos comandos (seja recebendo atribuição em `CMD` ou lido dentro de `FATOR`) é validado imediatamente via `tabela.verificarDeclarada(no.token)`. |
 
 ---
 

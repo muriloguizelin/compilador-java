@@ -1,21 +1,31 @@
 package compilador;
 
 import java.util.*;
+import static compilador.Lexer.Tipo.*;
+import static compilador.ParserSLR.NaoTerminal.*;
 
 /**
- * Tabela de Transicao SLR(1) (ACTION e GOTO) e definicoes da Gramatica.
- * Contem as 44 regras de producao, os conjuntos FIRST/FOLLOW e os 95 estados LR(0).
+ * TABELA SINTÁTICA SLR(1) E DEFINIÇÃO DA GRAMÁTICA
+ * 
+ * Guarda as 44 regras da gramática, os conjuntos FIRST/FOLLOW e as tabelas ACTION e GOTO
+ * dos 95 estados canônicos LR(0).
  */
 public class TabelaSLR {
 
+    /**
+     * Representa uma Regra da Gramática (ex: "VAR -> TIPO VARS").
+     * - ladoEsquerdo (LHS): o Não-Terminal antes da seta (->).
+     * - ladoDireito  (RHS): a sequência de símbolos depois da seta (->). Vazio = lambda (ε).
+     */
     public static class Regra {
-        public final int id;
-        public final ParserSLR.NaoTerminal lhs;
-        public final Object[] rhs;
-        public Regra(int id, ParserSLR.NaoTerminal lhs, Object... rhs) {
-            this.id = id;
-            this.lhs = lhs;
-            this.rhs = rhs;
+        public final int numeroRegra;
+        public final ParserSLR.NaoTerminal ladoEsquerdo;
+        public final Object[] ladoDireito;
+
+        public Regra(int numeroRegra, ParserSLR.NaoTerminal ladoEsquerdo, Object... ladoDireito) {
+            this.numeroRegra = numeroRegra;
+            this.ladoEsquerdo = ladoEsquerdo;
+            this.ladoDireito = ladoDireito;
         }
     }
 
@@ -23,50 +33,42 @@ public class TabelaSLR {
 
     public static class Acao {
         public final AcaoTipo tipo;
-        public final int valor;   // estado destino para SHIFT
-        public final Regra regra; // regra gramatical para REDUCE
+        public final int estadoDestino;      // Usado quando tipo == SHIFT
+        public final Regra regraParaReduzir; // Usado quando tipo == REDUCE
 
-        public Acao(AcaoTipo t, int v, Regra r) {
-            this.tipo = t;
-            this.valor = v;
-            this.regra = r;
+        public Acao(AcaoTipo tipo, int estadoDestino, Regra regraParaReduzir) {
+            this.tipo = tipo;
+            this.estadoDestino = estadoDestino;
+            this.regraParaReduzir = regraParaReduzir;
         }
-
-        public static Acao shift(int st)   { return new Acao(AcaoTipo.SHIFT, st, null); }
-        public static Acao reduce(Regra r) { return new Acao(AcaoTipo.REDUCE, 0, r); }
-        public static Acao accept()        { return new Acao(AcaoTipo.ACCEPT, 0, null); }
-        public static Acao error()         { return new Acao(AcaoTipo.ERROR, 0, null); }
     }
 
-    private final List<Regra> regras = new ArrayList<>();
-    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> first = new EnumMap<>(ParserSLR.NaoTerminal.class);
-    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> follow = new EnumMap<>(ParserSLR.NaoTerminal.class);
+    private final List<Regra> regrasDaGramatica = new ArrayList<>();
+    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> conjuntoFirst = new EnumMap<>(ParserSLR.NaoTerminal.class);
+    private final Map<ParserSLR.NaoTerminal, Set<Lexer.Tipo>> conjuntoFollow = new EnumMap<>(ParserSLR.NaoTerminal.class);
     private final Map<Integer, Map<Lexer.Tipo, Acao>> tabelaAction = new HashMap<>();
     private final Map<Integer, Map<ParserSLR.NaoTerminal, Integer>> tabelaGoto = new HashMap<>();
 
     public TabelaSLR() {
         definirGramatica();
-        carregarFirstPredefinido();
-        carregarFollowPredefinido();
-        carregarActionPredefinido();
-        carregarGotoPredefinido();
+        carregarFirstFollow();
+        carregarEstadosSLR();
     }
 
-    public Acao obterAcao(int estado, Lexer.Tipo tipo) {
-        Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estado);
-        if (linha != null && linha.containsKey(tipo)) {
-            return linha.get(tipo);
-        }
-        return Acao.error();
+    public Acao obterAcao(int estadoAtual, Lexer.Tipo tipoDoToken) {
+        Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estadoAtual);
+        return (linha != null && linha.containsKey(tipoDoToken))
+                ? linha.get(tipoDoToken)
+                : new Acao(AcaoTipo.ERROR, 0, null);
     }
 
-    public Integer obterGoto(int estado, ParserSLR.NaoTerminal nt) {
-        Map<ParserSLR.NaoTerminal, Integer> linha = tabelaGoto.get(estado);
-        return (linha != null) ? linha.get(nt) : null;
+    public Integer obterGoto(int estadoAtual, ParserSLR.NaoTerminal naoTerminal) {
+        Map<ParserSLR.NaoTerminal, Integer> linha = tabelaGoto.get(estadoAtual);
+        return (linha != null) ? linha.get(naoTerminal) : null;
     }
 
-    public Set<Lexer.Tipo> obterTokensEsperados(int estado) {
-        Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estado);
+    public Set<Lexer.Tipo> obterTokensEsperados(int estadoAtual) {
+        Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estadoAtual);
         return (linha != null) ? linha.keySet() : Collections.emptySet();
     }
 
@@ -75,424 +77,345 @@ public class TabelaSLR {
         System.out.println("                 CONJUNTOS FIRST E FOLLOW DA GRAMATICA                    ");
         System.out.println("--------------------------------------------------------------------------");
         for (ParserSLR.NaoTerminal nt : ParserSLR.NaoTerminal.values()) {
-            System.out.printf("%-14s | FIRST: %-35s | FOLLOW: %s%n",
-                    nt, first.get(nt), follow.get(nt));
+            System.out.printf("%-14s | FIRST: %-35s | FOLLOW: %s%n", nt, conjuntoFirst.get(nt), conjuntoFollow.get(nt));
         }
         System.out.println("--------------------------------------------------------------------------");
     }
 
-    private void addR(ParserSLR.NaoTerminal lhs, Object... rhs) {
-        regras.add(new Regra(regras.size(), lhs, rhs));
+    // --------------------------------------------------------------------------
+    // Métodos auxiliares para cadastrar Regras, FIRST, FOLLOW, ACTION e GOTO
+    // --------------------------------------------------------------------------
+
+    private void adicionarRegra(ParserSLR.NaoTerminal ladoEsquerdo, Object... ladoDireito) {
+        regrasDaGramatica.add(new Regra(regrasDaGramatica.size(), ladoEsquerdo, ladoDireito));
     }
 
-    private void shift(int st, Lexer.Tipo t, int prox) {
-        tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(t, Acao.shift(prox));
+    private void definirFirst(ParserSLR.NaoTerminal nt, Lexer.Tipo... tokens) {
+        conjuntoFirst.put(nt, new LinkedHashSet<>(Arrays.asList(tokens)));
     }
 
-    // Regra fundamental do SLR(1): quando um estado completa a regra A -> beta,
-    // aplica-se REDUCE para todos os terminais que pertencem ao conjunto FOLLOW(A).
-    private void reduce(int st, int regraId) {
-        Regra r = regras.get(regraId);
-        for (Lexer.Tipo tokenFollow : follow.get(r.lhs)) {
-            tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(tokenFollow, Acao.reduce(r));
+    private void definirFollow(ParserSLR.NaoTerminal nt, Lexer.Tipo... tokens) {
+        conjuntoFollow.put(nt, new LinkedHashSet<>(Arrays.asList(tokens)));
+    }
+
+    private void adicionarShift(int estadoAtual, Lexer.Tipo tokenLido, int estadoDestino) {
+        tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())
+                    .put(tokenLido, new Acao(AcaoTipo.SHIFT, estadoDestino, null));
+    }
+
+    // Regra do SLR(1): aplica REDUCE pela regra indicada para todos os tokens que pertencem a FOLLOW(ladoEsquerdo)
+    private void adicionarReduce(int estadoAtual, int numeroDaRegra) {
+        Regra regra = regrasDaGramatica.get(numeroDaRegra);
+        for (Lexer.Tipo tokenDoFollow : conjuntoFollow.get(regra.ladoEsquerdo)) {
+            tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())
+                        .put(tokenDoFollow, new Acao(AcaoTipo.REDUCE, 0, regra));
         }
     }
 
-    private void accept(int st, Lexer.Tipo t) {
-        tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(t, Acao.accept());
+    private void adicionarAccept(int estadoAtual, Lexer.Tipo tokenFim) {
+        tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())
+                    .put(tokenFim, new Acao(AcaoTipo.ACCEPT, 0, null));
     }
 
-    private void desvio(int st, ParserSLR.NaoTerminal nt, int prox) {
-        tabelaGoto.computeIfAbsent(st, k -> new HashMap<>()).put(nt, prox);
+    private void adicionarGoto(int estadoAtual, ParserSLR.NaoTerminal naoTerminal, int estadoDestino) {
+        tabelaGoto.computeIfAbsent(estadoAtual, k -> new HashMap<>())
+                  .put(naoTerminal, estadoDestino);
     }
 
     // ==========================================================================
-    // 1. DEFINICAO DAS 44 REGRAS DA GRAMATICA (lalg-java.txt)
+    // 1. AS 44 REGRAS DA GRAMÁTICA (lalg-java.txt)
     // ==========================================================================
     private void definirGramatica() {
-        /* R0  */ addR(ParserSLR.NaoTerminal.START, ParserSLR.NaoTerminal.PROG);
-        /* R1  */ addR(ParserSLR.NaoTerminal.PROG, Lexer.Tipo.PUBLIC, Lexer.Tipo.CLASS, Lexer.Tipo.ID, Lexer.Tipo.ABRE_CHAVE,
-                Lexer.Tipo.PUBLIC, Lexer.Tipo.STATIC, Lexer.Tipo.VOID, Lexer.Tipo.MAIN,
-                Lexer.Tipo.ABRE_PAR, Lexer.Tipo.STRING, Lexer.Tipo.ABRE_COLCH, Lexer.Tipo.FECHA_COLCH,
-                Lexer.Tipo.ID, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.ABRE_CHAVE,
-                ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.FECHA_CHAVE);
-        /* R2  */ addR(ParserSLR.NaoTerminal.DC, ParserSLR.NaoTerminal.VAR, ParserSLR.NaoTerminal.MAIS_CMDS);
-        /* R3  */ addR(ParserSLR.NaoTerminal.VAR, ParserSLR.NaoTerminal.TIPO, ParserSLR.NaoTerminal.VARS);
-        /* R4  */ addR(ParserSLR.NaoTerminal.VARS, Lexer.Tipo.ID, ParserSLR.NaoTerminal.MAIS_VAR);
-        /* R5  */ addR(ParserSLR.NaoTerminal.MAIS_VAR, Lexer.Tipo.VIRGULA, ParserSLR.NaoTerminal.VARS);
-        /* R6  */ addR(ParserSLR.NaoTerminal.MAIS_VAR); // lambda
-        /* R7  */ addR(ParserSLR.NaoTerminal.TIPO, Lexer.Tipo.DOUBLE);
-        /* R8  */ addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.CMD, ParserSLR.NaoTerminal.MAIS_CMDS);
-        /* R9  */ addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.CMD_COND, ParserSLR.NaoTerminal.CMDS);
-        /* R10 */ addR(ParserSLR.NaoTerminal.CMDS, ParserSLR.NaoTerminal.DC);
-        /* R11 */ addR(ParserSLR.NaoTerminal.CMDS); // lambda
-        /* R12 */ addR(ParserSLR.NaoTerminal.MAIS_CMDS, Lexer.Tipo.PONTO_VIRG, ParserSLR.NaoTerminal.CMDS);
-        /* R13 */ addR(ParserSLR.NaoTerminal.CMD_COND, Lexer.Tipo.IF, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.CONDICAO, Lexer.Tipo.FECHA_PAR,
-                Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE, ParserSLR.NaoTerminal.PFALSA);
-        /* R14 */ addR(ParserSLR.NaoTerminal.CMD_COND, Lexer.Tipo.WHILE, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.CONDICAO, Lexer.Tipo.FECHA_PAR,
-                Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE);
-        /* R15 */ addR(ParserSLR.NaoTerminal.CMD, Lexer.Tipo.PRINT, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.EXPRESSAO, Lexer.Tipo.FECHA_PAR);
-        /* R16 */ addR(ParserSLR.NaoTerminal.CMD, Lexer.Tipo.ID, ParserSLR.NaoTerminal.RESTO_IDENT);
-        /* R17 */ addR(ParserSLR.NaoTerminal.PFALSA, Lexer.Tipo.ELSE, Lexer.Tipo.ABRE_CHAVE, ParserSLR.NaoTerminal.CMDS, Lexer.Tipo.FECHA_CHAVE);
-        /* R18 */ addR(ParserSLR.NaoTerminal.PFALSA); // lambda
-        /* R19 */ addR(ParserSLR.NaoTerminal.RESTO_IDENT, Lexer.Tipo.ATRIB, ParserSLR.NaoTerminal.EXP_IDENT);
-        /* R20 */ addR(ParserSLR.NaoTerminal.EXP_IDENT, ParserSLR.NaoTerminal.EXPRESSAO);
-        /* R21 */ addR(ParserSLR.NaoTerminal.EXP_IDENT, Lexer.Tipo.LER_DOUBLE);
-        /* R22 */ addR(ParserSLR.NaoTerminal.CONDICAO, ParserSLR.NaoTerminal.EXPRESSAO, ParserSLR.NaoTerminal.RELACAO, ParserSLR.NaoTerminal.EXPRESSAO);
-        /* R23 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.EQ);
-        /* R24 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.NE);
-        /* R25 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.GE);
-        /* R26 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.LE);
-        /* R27 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.GT);
-        /* R28 */ addR(ParserSLR.NaoTerminal.RELACAO, Lexer.Tipo.LT);
-        /* R29 */ addR(ParserSLR.NaoTerminal.EXPRESSAO, ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OUTROS_TERMOS);
-        /* R30 */ addR(ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OP_UN, ParserSLR.NaoTerminal.FATOR, ParserSLR.NaoTerminal.MAIS_FATORES);
-        /* R31 */ addR(ParserSLR.NaoTerminal.OP_UN, Lexer.Tipo.MENOS);
-        /* R32 */ addR(ParserSLR.NaoTerminal.OP_UN); // lambda
-        /* R33 */ addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.ID);
-        /* R34 */ addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.NUMERO_REAL);
-        /* R35 */ addR(ParserSLR.NaoTerminal.FATOR, Lexer.Tipo.ABRE_PAR, ParserSLR.NaoTerminal.EXPRESSAO, Lexer.Tipo.FECHA_PAR);
-        /* R36 */ addR(ParserSLR.NaoTerminal.OUTROS_TERMOS, ParserSLR.NaoTerminal.OP_AD, ParserSLR.NaoTerminal.TERMO, ParserSLR.NaoTerminal.OUTROS_TERMOS);
-        /* R37 */ addR(ParserSLR.NaoTerminal.OUTROS_TERMOS); // lambda
-        /* R38 */ addR(ParserSLR.NaoTerminal.OP_AD, Lexer.Tipo.MAIS);
-        /* R39 */ addR(ParserSLR.NaoTerminal.OP_AD, Lexer.Tipo.MENOS);
-        /* R40 */ addR(ParserSLR.NaoTerminal.MAIS_FATORES, ParserSLR.NaoTerminal.OP_MUL, ParserSLR.NaoTerminal.FATOR, ParserSLR.NaoTerminal.MAIS_FATORES);
-        /* R41 */ addR(ParserSLR.NaoTerminal.MAIS_FATORES); // lambda
-        /* R42 */ addR(ParserSLR.NaoTerminal.OP_MUL, Lexer.Tipo.MULT);
-        /* R43 */ addR(ParserSLR.NaoTerminal.OP_MUL, Lexer.Tipo.DIV);
+        /* R0  */ adicionarRegra(START, PROG);
+        /* R1  */ adicionarRegra(PROG, PUBLIC, CLASS, ID, ABRE_CHAVE, PUBLIC, STATIC, VOID, MAIN,
+                                 ABRE_PAR, STRING, ABRE_COLCH, FECHA_COLCH, ID, FECHA_PAR, ABRE_CHAVE,
+                                 CMDS, FECHA_CHAVE, FECHA_CHAVE);
+
+        // Declarações de variáveis: "double a, b, c;"
+        /* R2  */ adicionarRegra(DC, VAR, MAIS_CMDS);
+        /* R3  */ adicionarRegra(VAR, TIPO, VARS);
+        /* R4  */ adicionarRegra(VARS, ID, MAIS_VAR);
+        /* R5  */ adicionarRegra(MAIS_VAR, VIRGULA, VARS);
+        /* R6  */ adicionarRegra(MAIS_VAR); // vazio
+        /* R7  */ adicionarRegra(TIPO, DOUBLE);
+
+        // Blocos de comandos, if/else, while, System.out.println e atribuição
+        /* R8  */ adicionarRegra(CMDS, CMD, MAIS_CMDS);
+        /* R9  */ adicionarRegra(CMDS, CMD_COND, CMDS);
+        /* R10 */ adicionarRegra(CMDS, DC);
+        /* R11 */ adicionarRegra(CMDS); // vazio
+        /* R12 */ adicionarRegra(MAIS_CMDS, PONTO_VIRG, CMDS);
+        /* R13 */ adicionarRegra(CMD_COND, IF, ABRE_PAR, CONDICAO, FECHA_PAR, ABRE_CHAVE, CMDS, FECHA_CHAVE, PFALSA);
+        /* R14 */ adicionarRegra(CMD_COND, WHILE, ABRE_PAR, CONDICAO, FECHA_PAR, ABRE_CHAVE, CMDS, FECHA_CHAVE);
+        /* R15 */ adicionarRegra(CMD, PRINT, ABRE_PAR, EXPRESSAO, FECHA_PAR);
+        /* R16 */ adicionarRegra(CMD, ID, RESTO_IDENT);
+        /* R17 */ adicionarRegra(PFALSA, ELSE, ABRE_CHAVE, CMDS, FECHA_CHAVE);
+        /* R18 */ adicionarRegra(PFALSA); // vazio
+        /* R19 */ adicionarRegra(RESTO_IDENT, ATRIB, EXP_IDENT);
+        /* R20 */ adicionarRegra(EXP_IDENT, EXPRESSAO);
+        /* R21 */ adicionarRegra(EXP_IDENT, LER_DOUBLE);
+
+        // Condições e operadores relacionais
+        /* R22 */ adicionarRegra(CONDICAO, EXPRESSAO, RELACAO, EXPRESSAO);
+        /* R23 */ adicionarRegra(RELACAO, EQ); // ==
+        /* R24 */ adicionarRegra(RELACAO, NE); // !=
+        /* R25 */ adicionarRegra(RELACAO, GE); // >=
+        /* R26 */ adicionarRegra(RELACAO, LE); // <=
+        /* R27 */ adicionarRegra(RELACAO, GT); // >
+        /* R28 */ adicionarRegra(RELACAO, LT); // <
+
+        // Expressões aritméticas (+, -, *, /, parênteses e sinal negativo unário)
+        /* R29 */ adicionarRegra(EXPRESSAO, TERMO, OUTROS_TERMOS);
+        /* R30 */ adicionarRegra(TERMO, OP_UN, FATOR, MAIS_FATORES);
+        /* R31 */ adicionarRegra(OP_UN, MENOS);
+        /* R32 */ adicionarRegra(OP_UN); // vazio
+        /* R33 */ adicionarRegra(FATOR, ID);
+        /* R34 */ adicionarRegra(FATOR, NUMERO_REAL);
+        /* R35 */ adicionarRegra(FATOR, ABRE_PAR, EXPRESSAO, FECHA_PAR);
+        /* R36 */ adicionarRegra(OUTROS_TERMOS, OP_AD, TERMO, OUTROS_TERMOS);
+        /* R37 */ adicionarRegra(OUTROS_TERMOS); // vazio
+        /* R38 */ adicionarRegra(OP_AD, MAIS);
+        /* R39 */ adicionarRegra(OP_AD, MENOS);
+        /* R40 */ adicionarRegra(MAIS_FATORES, OP_MUL, FATOR, MAIS_FATORES);
+        /* R41 */ adicionarRegra(MAIS_FATORES); // vazio
+        /* R42 */ adicionarRegra(OP_MUL, MULT);
+        /* R43 */ adicionarRegra(OP_MUL, DIV);
     }
 
     // ==========================================================================
-    // 2. CONJUNTOS FIRST PRE-SETADOS DA GRAMATICA
+    // 2. CONJUNTOS FIRST E FOLLOW
     // ==========================================================================
-    private void carregarFirstPredefinido() {
-        first.put(ParserSLR.NaoTerminal.START, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PUBLIC)));
-        first.put(ParserSLR.NaoTerminal.PROG, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PUBLIC)));
-        first.put(ParserSLR.NaoTerminal.DC, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
-        first.put(ParserSLR.NaoTerminal.VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
-        first.put(ParserSLR.NaoTerminal.VARS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.MAIS_VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.VIRGULA)));
-        first.put(ParserSLR.NaoTerminal.TIPO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE)));
-        first.put(ParserSLR.NaoTerminal.CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.MAIS_CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        first.put(ParserSLR.NaoTerminal.CMD_COND, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.IF, Lexer.Tipo.WHILE)));
-        first.put(ParserSLR.NaoTerminal.CMD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.PFALSA, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ELSE)));
-        first.put(ParserSLR.NaoTerminal.RESTO_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ATRIB)));
-        first.put(ParserSLR.NaoTerminal.EXP_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.LER_DOUBLE, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.CONDICAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.RELACAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.GT)));
-        first.put(ParserSLR.NaoTerminal.EXPRESSAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.TERMO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.OP_UN, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MENOS)));
-        first.put(ParserSLR.NaoTerminal.FATOR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        first.put(ParserSLR.NaoTerminal.OUTROS_TERMOS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MAIS, Lexer.Tipo.MENOS)));
-        first.put(ParserSLR.NaoTerminal.OP_AD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MAIS, Lexer.Tipo.MENOS)));
-        first.put(ParserSLR.NaoTerminal.MAIS_FATORES, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MULT, Lexer.Tipo.DIV)));
-        first.put(ParserSLR.NaoTerminal.OP_MUL, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.MULT, Lexer.Tipo.DIV)));
+    private void carregarFirstFollow() {
+        definirFirst(START, PUBLIC);
+        definirFirst(PROG, PUBLIC);
+        definirFirst(DC, DOUBLE);
+        definirFirst(VAR, DOUBLE);
+        definirFirst(VARS, ID);
+        definirFirst(MAIS_VAR, VIRGULA);
+        definirFirst(TIPO, DOUBLE);
+        definirFirst(CMDS, DOUBLE, IF, WHILE, PRINT, ID);
+        definirFirst(MAIS_CMDS, PONTO_VIRG);
+        definirFirst(CMD_COND, IF, WHILE);
+        definirFirst(CMD, PRINT, ID);
+        definirFirst(PFALSA, ELSE);
+        definirFirst(RESTO_IDENT, ATRIB);
+        definirFirst(EXP_IDENT, ABRE_PAR, LER_DOUBLE, MENOS, NUMERO_REAL, ID);
+        definirFirst(CONDICAO, ABRE_PAR, MENOS, NUMERO_REAL, ID);
+        definirFirst(RELACAO, NE, GE, LT, EQ, LE, GT);
+        definirFirst(EXPRESSAO, ABRE_PAR, MENOS, NUMERO_REAL, ID);
+        definirFirst(TERMO, ABRE_PAR, MENOS, NUMERO_REAL, ID);
+        definirFirst(OP_UN, MENOS);
+        definirFirst(FATOR, ABRE_PAR, NUMERO_REAL, ID);
+        definirFirst(OUTROS_TERMOS, MAIS, MENOS);
+        definirFirst(OP_AD, MAIS, MENOS);
+        definirFirst(MAIS_FATORES, MULT, DIV);
+        definirFirst(OP_MUL, MULT, DIV);
+
+        definirFollow(START, EOF);
+        definirFollow(PROG, EOF);
+        definirFollow(DC, FECHA_CHAVE);
+        definirFollow(VAR, PONTO_VIRG);
+        definirFollow(VARS, PONTO_VIRG);
+        definirFollow(MAIS_VAR, PONTO_VIRG);
+        definirFollow(TIPO, ID);
+        definirFollow(CMDS, FECHA_CHAVE);
+        definirFollow(MAIS_CMDS, FECHA_CHAVE);
+        definirFollow(CMD_COND, DOUBLE, FECHA_CHAVE, IF, WHILE, PRINT, ID);
+        definirFollow(CMD, PONTO_VIRG);
+        definirFollow(PFALSA, DOUBLE, FECHA_CHAVE, IF, WHILE, PRINT, ID);
+        definirFollow(RESTO_IDENT, PONTO_VIRG);
+        definirFollow(EXP_IDENT, PONTO_VIRG);
+        definirFollow(CONDICAO, FECHA_PAR);
+        definirFollow(RELACAO, ABRE_PAR, MENOS, NUMERO_REAL, ID);
+        definirFollow(EXPRESSAO, PONTO_VIRG, NE, GE, LT, EQ, LE, FECHA_PAR, GT);
+        definirFollow(TERMO, PONTO_VIRG, NE, MAIS, GE, LT, EQ, LE, FECHA_PAR, MENOS, GT);
+        definirFollow(OP_UN, ABRE_PAR, NUMERO_REAL, ID);
+        definirFollow(FATOR, PONTO_VIRG, NE, MULT, MAIS, GE, LT, EQ, LE, FECHA_PAR, MENOS, GT, DIV);
+        definirFollow(OUTROS_TERMOS, PONTO_VIRG, NE, GE, LT, EQ, LE, FECHA_PAR, GT);
+        definirFollow(OP_AD, ABRE_PAR, MENOS, NUMERO_REAL, ID);
+        definirFollow(MAIS_FATORES, PONTO_VIRG, NE, MAIS, GE, LT, EQ, LE, FECHA_PAR, MENOS, GT);
+        definirFollow(OP_MUL, ABRE_PAR, NUMERO_REAL, ID);
     }
 
     // ==========================================================================
-    // 3. CONJUNTOS FOLLOW PRE-SETADOS DA GRAMATICA (USADOS NAS REDUCOES SLR)
+    // 3. PADRÕES REUTILIZÁVEIS DOS ESTADOS SLR(1)
     // ==========================================================================
-    private void carregarFollowPredefinido() {
-        follow.put(ParserSLR.NaoTerminal.START, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.EOF)));
-        follow.put(ParserSLR.NaoTerminal.PROG, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.EOF)));
-        follow.put(ParserSLR.NaoTerminal.DC, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
-        follow.put(ParserSLR.NaoTerminal.VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.VARS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.MAIS_VAR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.TIPO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
-        follow.put(ParserSLR.NaoTerminal.MAIS_CMDS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_CHAVE)));
-        follow.put(ParserSLR.NaoTerminal.CMD_COND, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.CMD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.PFALSA, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.DOUBLE, Lexer.Tipo.FECHA_CHAVE, Lexer.Tipo.IF, Lexer.Tipo.WHILE, Lexer.Tipo.PRINT, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.RESTO_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.EXP_IDENT, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG)));
-        follow.put(ParserSLR.NaoTerminal.CONDICAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.FECHA_PAR)));
-        follow.put(ParserSLR.NaoTerminal.RELACAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.EXPRESSAO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.TERMO, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.OP_UN, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.FATOR, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MULT, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT, Lexer.Tipo.DIV)));
-        follow.put(ParserSLR.NaoTerminal.OUTROS_TERMOS, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.OP_AD, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
-        follow.put(ParserSLR.NaoTerminal.MAIS_FATORES, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.PONTO_VIRG, Lexer.Tipo.NE, Lexer.Tipo.MAIS, Lexer.Tipo.GE, Lexer.Tipo.LT, Lexer.Tipo.EQ, Lexer.Tipo.LE, Lexer.Tipo.FECHA_PAR, Lexer.Tipo.MENOS, Lexer.Tipo.GT)));
-        follow.put(ParserSLR.NaoTerminal.OP_MUL, new LinkedHashSet<>(Arrays.asList(Lexer.Tipo.ABRE_PAR, Lexer.Tipo.NUMERO_REAL, Lexer.Tipo.ID)));
+
+    // Configura um Estado "Hub" que lê um bloco de comandos { CMDS } (Estados 16, 26, 33, 73, 81, 92)
+    private void configurarHubDeComandos(int estadoHub, int destinoCmds) {
+        adicionarShift(estadoHub, DOUBLE, 17);
+        adicionarShift(estadoHub, IF, 18);
+        adicionarShift(estadoHub, WHILE, 19);
+        adicionarShift(estadoHub, PRINT, 20);
+        adicionarShift(estadoHub, ID, 21);
+        adicionarReduce(estadoHub, 11); // R11: CMDS -> vazio (quando encontra '}')
+
+        adicionarGoto(estadoHub, CMDS, destinoCmds);
+        adicionarGoto(estadoHub, DC, 22);
+        adicionarGoto(estadoHub, VAR, 23);
+        adicionarGoto(estadoHub, TIPO, 24);
+        adicionarGoto(estadoHub, CMD_COND, 26);
+        adicionarGoto(estadoHub, CMD, 27);
+    }
+
+    // Configura um estado onde se inicia a leitura de uma EXPRESSAO (Estados 28, 29, 30, 31, 61, 68)
+    private void configurarInicioExpressao(int estado, int destinoExpressao) {
+        adicionarShift(estado, MENOS, 40);
+        adicionarReduce(estado, 32); // R32: OP_UN -> vazio
+        adicionarGoto(estado, OP_UN, 44);
+        adicionarGoto(estado, TERMO, 43);
+        adicionarGoto(estado, EXPRESSAO, destinoExpressao);
+    }
+
+    // Configura um estado que espera ler um FATOR: id, numero_real ou '(' (Estados 44, 80)
+    private void configurarInicioFator(int estado, int destinoFator) {
+        adicionarShift(estado, ID, 66);
+        adicionarShift(estado, NUMERO_REAL, 67);
+        adicionarShift(estado, ABRE_PAR, 68);
+        adicionarGoto(estado, FATOR, destinoFator);
+    }
+
+    // Configura um estado após um TERMO, que pode somar/subtrair ou encerrar (Estados 43, 75)
+    private void configurarContinuacaoSoma(int estado, int destinoOutrosTermos) {
+        adicionarShift(estado, MAIS, 62);
+        adicionarShift(estado, MENOS, 63);
+        adicionarReduce(estado, 37); // R37: OUTROS_TERMOS -> vazio
+        adicionarGoto(estado, OP_AD, 65);
+        adicionarGoto(estado, OUTROS_TERMOS, destinoOutrosTermos);
+    }
+
+    // Configura um estado após um FATOR, que pode multiplicar/dividir ou encerrar (Estados 69, 85)
+    private void configurarContinuacaoMult(int estado, int destinoMaisFatores) {
+        adicionarShift(estado, MULT, 77);
+        adicionarShift(estado, DIV, 78);
+        adicionarReduce(estado, 41); // R41: MAIS_FATORES -> vazio
+        adicionarGoto(estado, OP_MUL, 80);
+        adicionarGoto(estado, MAIS_FATORES, destinoMaisFatores);
     }
 
     // ==========================================================================
-    // 4. TABELA ACTION DOS 95 ESTADOS CANONICOS LR(0)
+    // 4. CARREGAMENTO DOS 95 ESTADOS (ACTION & GOTO)
     // ==========================================================================
-    private void carregarActionPredefinido() {
-        shift(0, Lexer.Tipo.PUBLIC, 1);
-        shift(1, Lexer.Tipo.CLASS, 3);
-        accept(2, Lexer.Tipo.EOF);
-        shift(3, Lexer.Tipo.ID, 4);
-        shift(4, Lexer.Tipo.ABRE_CHAVE, 5);
-        shift(5, Lexer.Tipo.PUBLIC, 6);
-        shift(6, Lexer.Tipo.STATIC, 7);
-        shift(7, Lexer.Tipo.VOID, 8);
-        shift(8, Lexer.Tipo.MAIN, 9);
-        shift(9, Lexer.Tipo.ABRE_PAR, 10);
-        shift(10, Lexer.Tipo.STRING, 11);
-        shift(11, Lexer.Tipo.ABRE_COLCH, 12);
-        shift(12, Lexer.Tipo.FECHA_COLCH, 13);
-        shift(13, Lexer.Tipo.ID, 14);
-        shift(14, Lexer.Tipo.FECHA_PAR, 15);
-        shift(15, Lexer.Tipo.ABRE_CHAVE, 16);
+    private void carregarEstadosSLR() {
+        // --- Trilha 1: Cabeçalho "public class id { public static void main ( String [ ] id ) {" e Aceitação ---
+        adicionarShift(0, PUBLIC, 1);   adicionarGoto(0, PROG, 2);
+        adicionarShift(1, CLASS, 3);
+        adicionarAccept(2, EOF);        // Estado 02: Programa aceito no '$' (EOF)!
+        adicionarShift(3, ID, 4);
+        adicionarShift(4, ABRE_CHAVE, 5);
+        adicionarShift(5, PUBLIC, 6);
+        adicionarShift(6, STATIC, 7);
+        adicionarShift(7, VOID, 8);
+        adicionarShift(8, MAIN, 9);
+        adicionarShift(9, ABRE_PAR, 10);
+        adicionarShift(10, STRING, 11);
+        adicionarShift(11, ABRE_COLCH, 12);
+        adicionarShift(12, FECHA_COLCH, 13);
+        adicionarShift(13, ID, 14);
+        adicionarShift(14, FECHA_PAR, 15);
+        adicionarShift(15, ABRE_CHAVE, 16);
+        adicionarShift(25, FECHA_CHAVE, 37);
+        adicionarShift(37, FECHA_CHAVE, 53);
+        adicionarReduce(53, 1); // R1: PROG completo
 
-        // Estado 16: Hub de comandos no inicio do main
-        shift(16, Lexer.Tipo.DOUBLE, 17);
-        shift(16, Lexer.Tipo.IF, 18);
-        shift(16, Lexer.Tipo.WHILE, 19);
-        shift(16, Lexer.Tipo.PRINT, 20);
-        shift(16, Lexer.Tipo.ID, 21);
-        reduce(16, 11); // CMDS -> lambda
+        // --- Trilha 2: Os 6 Hubs de Comandos { CMDS } e Fechamento de Sequências ---
+        configurarHubDeComandos(16, 25); // Hub no início do main { ... }
+        configurarHubDeComandos(26, 38); // Hub após fechar um if ou while
+        configurarHubDeComandos(33, 50); // Hub após ponto-e-vírgula (;)
+        configurarHubDeComandos(73, 82); // Hub dentro do bloco if { ... }
+        configurarHubDeComandos(81, 86); // Hub dentro do bloco while { ... }
+        configurarHubDeComandos(92, 93); // Hub dentro do bloco else { ... }
 
-        reduce(17, 7);  // TIPO -> double
-        shift(18, Lexer.Tipo.ABRE_PAR, 28);
-        shift(19, Lexer.Tipo.ABRE_PAR, 29);
-        shift(20, Lexer.Tipo.ABRE_PAR, 30);
-        shift(21, Lexer.Tipo.ATRIB, 31);
-        reduce(22, 10); // CMDS -> DC
-        shift(23, Lexer.Tipo.PONTO_VIRG, 33);
-        shift(24, Lexer.Tipo.ID, 35);
-        shift(25, Lexer.Tipo.FECHA_CHAVE, 37);
+        adicionarReduce(22, 10); // R10: CMDS -> DC
+        adicionarShift(27, PONTO_VIRG, 33); adicionarGoto(27, MAIS_CMDS, 39);
+        adicionarReduce(34, 2);  // R2: DC -> VAR MAIS_CMDS
+        adicionarReduce(38, 9);  // R9: CMDS -> CMD_COND CMDS
+        adicionarReduce(39, 8);  // R8: CMDS -> CMD MAIS_CMDS
+        adicionarReduce(50, 12); // R12: MAIS_CMDS -> ; CMDS
 
-        // Estado 26: Comandos apos um bloco condicional (if/while)
-        shift(26, Lexer.Tipo.DOUBLE, 17);
-        shift(26, Lexer.Tipo.IF, 18);
-        shift(26, Lexer.Tipo.WHILE, 19);
-        shift(26, Lexer.Tipo.PRINT, 20);
-        shift(26, Lexer.Tipo.ID, 21);
-        reduce(26, 11); // CMDS -> lambda
+        // --- Trilha 3: Declaração de Variáveis (double a, b, c;) ---
+        adicionarReduce(17, 7);  // R7: TIPO -> double
+        adicionarShift(23, PONTO_VIRG, 33); adicionarGoto(23, MAIS_CMDS, 34);
+        adicionarShift(24, ID, 35);         adicionarGoto(24, VARS, 36);
+        adicionarShift(35, VIRGULA, 51);    adicionarReduce(35, 6); adicionarGoto(35, MAIS_VAR, 52);
+        adicionarReduce(36, 3);  // R3: VAR -> TIPO VARS
+        adicionarShift(51, ID, 35);         adicionarGoto(51, VARS, 72);
+        adicionarReduce(52, 4);  // R4: VARS -> id MAIS_VAR
+        adicionarReduce(72, 5);  // R5: MAIS_VAR -> , VARS
 
-        shift(27, Lexer.Tipo.PONTO_VIRG, 33);
-        shift(28, Lexer.Tipo.MENOS, 40);
-        reduce(28, 32); // OP_UN -> lambda
-        shift(29, Lexer.Tipo.MENOS, 40);
-        reduce(29, 32); // OP_UN -> lambda
-        shift(30, Lexer.Tipo.MENOS, 40);
-        reduce(30, 32); // OP_UN -> lambda
-        shift(31, Lexer.Tipo.LER_DOUBLE, 47);
-        shift(31, Lexer.Tipo.MENOS, 40);
-        reduce(31, 32); // OP_UN -> lambda
-        reduce(32, 16); // CMD -> id RESTO_IDENT
+        // --- Trilha 4: Comandos Simples (Atribuição id = ... e System.out.println) ---
+        adicionarShift(20, ABRE_PAR, 30);
+        adicionarShift(21, ATRIB, 31);      adicionarGoto(21, RESTO_IDENT, 32);
+        configurarInicioExpressao(30, 46);  // Expressão dentro do print(...)
+        configurarInicioExpressao(31, 49);  // Expressão após '='
+        adicionarShift(31, LER_DOUBLE, 47);
+        adicionarGoto(31, EXP_IDENT, 48);
+        adicionarReduce(32, 16); // R16: CMD -> id RESTO_IDENT
+        adicionarShift(46, FECHA_PAR, 71);
+        adicionarReduce(47, 21); // R21: EXP_IDENT -> lerDouble()
+        adicionarReduce(48, 19); // R19: RESTO_IDENT -> = EXP_IDENT
+        adicionarReduce(49, 20); // R20: EXP_IDENT -> EXPRESSAO
+        adicionarReduce(71, 15); // R15: CMD -> System.out.println ( EXPRESSAO )
 
-        // Estado 33: Comandos apos ponto-e-virgula
-        shift(33, Lexer.Tipo.DOUBLE, 17);
-        shift(33, Lexer.Tipo.IF, 18);
-        shift(33, Lexer.Tipo.WHILE, 19);
-        shift(33, Lexer.Tipo.PRINT, 20);
-        shift(33, Lexer.Tipo.ID, 21);
-        reduce(33, 11); // CMDS -> lambda
+        // --- Trilha 5: Comandos Condicionais (if / else) e Repetição (while) ---
+        adicionarShift(18, ABRE_PAR, 28);
+        adicionarShift(19, ABRE_PAR, 29);
+        configurarInicioExpressao(28, 42);  // 1ª expressão da condição do if
+        adicionarGoto(28, CONDICAO, 41);
+        configurarInicioExpressao(29, 42);  // 1ª expressão da condição do while
+        adicionarGoto(29, CONDICAO, 45);
+        adicionarShift(41, FECHA_PAR, 54);
+        adicionarShift(45, FECHA_PAR, 70);
+        adicionarShift(54, ABRE_CHAVE, 73);
+        adicionarShift(70, ABRE_CHAVE, 81);
+        adicionarShift(82, FECHA_CHAVE, 87);
+        adicionarShift(86, FECHA_CHAVE, 89);
+        adicionarShift(87, ELSE, 90);       adicionarReduce(87, 18); adicionarGoto(87, PFALSA, 91);
+        adicionarReduce(89, 14); // R14: while completo
+        adicionarShift(90, ABRE_CHAVE, 92);
+        adicionarReduce(91, 13); // R13: if/else completo
+        adicionarShift(93, FECHA_CHAVE, 94);
+        adicionarReduce(94, 17); // R17: PFALSA -> else { CMDS }
 
-        reduce(34, 2);  // DC -> VAR MAIS_CMDS
-        shift(35, Lexer.Tipo.VIRGULA, 51);
-        reduce(35, 6);  // MAIS_VAR -> lambda
-        reduce(36, 3);  // VAR -> TIPO VARS
-        shift(37, Lexer.Tipo.FECHA_CHAVE, 53);
-        reduce(38, 9);  // CMDS -> CMD_COND CMDS
-        reduce(39, 8);  // CMDS -> CMD MAIS_CMDS
-        reduce(40, 31); // OP_UN -> -
-        shift(41, Lexer.Tipo.FECHA_PAR, 54);
+        // --- Trilha 6: Condições e Operadores Relacionais (==, !=, >=, <=, >, <) ---
+        adicionarShift(42, EQ, 55);
+        adicionarShift(42, NE, 56);
+        adicionarShift(42, GE, 57);
+        adicionarShift(42, LE, 58);
+        adicionarShift(42, GT, 59);
+        adicionarShift(42, LT, 60);
+        adicionarGoto(42, RELACAO, 61);
+        adicionarReduce(55, 23); // R23: ==
+        adicionarReduce(56, 24); // R24: !=
+        adicionarReduce(57, 25); // R25: >=
+        adicionarReduce(58, 26); // R26: <=
+        adicionarReduce(59, 27); // R27: >
+        adicionarReduce(60, 28); // R28: <
+        configurarInicioExpressao(61, 74);  // 2ª expressão da condição após operador relacional
+        adicionarReduce(74, 22); // R22: CONDICAO -> EXPRESSAO RELACAO EXPRESSAO
 
-        // Estado 42: Operadores relacionais
-        shift(42, Lexer.Tipo.EQ, 55);
-        shift(42, Lexer.Tipo.NE, 56);
-        shift(42, Lexer.Tipo.GE, 57);
-        shift(42, Lexer.Tipo.LE, 58);
-        shift(42, Lexer.Tipo.GT, 59);
-        shift(42, Lexer.Tipo.LT, 60);
-
-        shift(43, Lexer.Tipo.MAIS, 62);
-        shift(43, Lexer.Tipo.MENOS, 63);
-        reduce(43, 37); // OUTROS_TERMOS -> lambda
-
-        shift(44, Lexer.Tipo.ID, 66);
-        shift(44, Lexer.Tipo.NUMERO_REAL, 67);
-        shift(44, Lexer.Tipo.ABRE_PAR, 68);
-        shift(45, Lexer.Tipo.FECHA_PAR, 70);
-        shift(46, Lexer.Tipo.FECHA_PAR, 71);
-        reduce(47, 21); // EXP_IDENT -> lerDouble()
-        reduce(48, 19); // RESTO_IDENT -> = EXP_IDENT
-        reduce(49, 20); // EXP_IDENT -> EXPRESSAO
-        reduce(50, 12); // MAIS_CMDS -> ; CMDS
-        shift(51, Lexer.Tipo.ID, 35);
-        reduce(52, 4);  // VARS -> id MAIS_VAR
-        reduce(53, 1);  // PROG -> public class id ...
-        shift(54, Lexer.Tipo.ABRE_CHAVE, 73);
-
-        reduce(55, 23); // RELACAO -> ==
-        reduce(56, 24); // RELACAO -> !=
-        reduce(57, 25); // RELACAO -> >=
-        reduce(58, 26); // RELACAO -> <=
-        reduce(59, 27); // RELACAO -> >
-        reduce(60, 28); // RELACAO -> <
-
-        shift(61, Lexer.Tipo.MENOS, 40);
-        reduce(61, 32); // OP_UN -> lambda
-        reduce(62, 38); // OP_AD -> +
-        reduce(63, 39); // OP_AD -> -
-        reduce(64, 29); // EXPRESSAO -> TERMO OUTROS_TERMOS
-        shift(65, Lexer.Tipo.MENOS, 40);
-        reduce(65, 32); // OP_UN -> lambda
-        reduce(66, 33); // FATOR -> id
-        reduce(67, 34); // FATOR -> numero_real
-        shift(68, Lexer.Tipo.MENOS, 40);
-        reduce(68, 32); // OP_UN -> lambda
-
-        shift(69, Lexer.Tipo.MULT, 77);
-        shift(69, Lexer.Tipo.DIV, 78);
-        reduce(69, 41); // MAIS_FATORES -> lambda
-
-        shift(70, Lexer.Tipo.ABRE_CHAVE, 81);
-        reduce(71, 15); // CMD -> System.out.println ( EXPRESSAO )
-        reduce(72, 5);  // MAIS_VAR -> , VARS
-
-        // Estado 73: Corpo do bloco if
-        shift(73, Lexer.Tipo.DOUBLE, 17);
-        shift(73, Lexer.Tipo.IF, 18);
-        shift(73, Lexer.Tipo.WHILE, 19);
-        shift(73, Lexer.Tipo.PRINT, 20);
-        shift(73, Lexer.Tipo.ID, 21);
-        reduce(73, 11); // CMDS -> lambda
-
-        reduce(74, 22); // CONDICAO -> EXPRESSAO RELACAO EXPRESSAO
-        shift(75, Lexer.Tipo.MAIS, 62);
-        shift(75, Lexer.Tipo.MENOS, 63);
-        reduce(75, 37); // OUTROS_TERMOS -> lambda
-        shift(76, Lexer.Tipo.FECHA_PAR, 84);
-        reduce(77, 42); // OP_MUL -> *
-        reduce(78, 43); // OP_MUL -> /
-        reduce(79, 30); // TERMO -> OP_UN FATOR MAIS_FATORES
-
-        shift(80, Lexer.Tipo.ID, 66);
-        shift(80, Lexer.Tipo.NUMERO_REAL, 67);
-        shift(80, Lexer.Tipo.ABRE_PAR, 68);
-
-        // Estado 81: Corpo do bloco while
-        shift(81, Lexer.Tipo.DOUBLE, 17);
-        shift(81, Lexer.Tipo.IF, 18);
-        shift(81, Lexer.Tipo.WHILE, 19);
-        shift(81, Lexer.Tipo.PRINT, 20);
-        shift(81, Lexer.Tipo.ID, 21);
-        reduce(81, 11); // CMDS -> lambda
-
-        shift(82, Lexer.Tipo.FECHA_CHAVE, 87);
-        reduce(83, 36); // OUTROS_TERMOS -> OP_AD TERMO OUTROS_TERMOS
-        reduce(84, 35); // FATOR -> ( EXPRESSAO )
-
-        shift(85, Lexer.Tipo.MULT, 77);
-        shift(85, Lexer.Tipo.DIV, 78);
-        reduce(85, 41); // MAIS_FATORES -> lambda
-
-        shift(86, Lexer.Tipo.FECHA_CHAVE, 89);
-
-        // Estado 87: Fechamento do if (decide entre else ou PFALSA -> lambda)
-        shift(87, Lexer.Tipo.ELSE, 90);
-        reduce(87, 18); // PFALSA -> lambda
-
-        reduce(88, 40); // MAIS_FATORES -> OP_MUL FATOR MAIS_FATORES
-        reduce(89, 14); // CMD_COND -> while ( CONDICAO ) { CMDS }
-        shift(90, Lexer.Tipo.ABRE_CHAVE, 92);
-        reduce(91, 13); // CMD_COND -> if ( CONDICAO ) { CMDS } PFALSA
-
-        // Estado 92: Corpo do bloco else
-        shift(92, Lexer.Tipo.DOUBLE, 17);
-        shift(92, Lexer.Tipo.IF, 18);
-        shift(92, Lexer.Tipo.WHILE, 19);
-        shift(92, Lexer.Tipo.PRINT, 20);
-        shift(92, Lexer.Tipo.ID, 21);
-        reduce(92, 11); // CMDS -> lambda
-
-        shift(93, Lexer.Tipo.FECHA_CHAVE, 94);
-        reduce(94, 17); // PFALSA -> else { CMDS }
-    }
-
-    // ==========================================================================
-    // 5. TABELA GOTO DOS NAO-TERMINAIS
-    // ==========================================================================
-    private void carregarGotoPredefinido() {
-        desvio(0, ParserSLR.NaoTerminal.PROG, 2);
-        desvio(16, ParserSLR.NaoTerminal.CMD, 27);
-        desvio(16, ParserSLR.NaoTerminal.CMDS, 25);
-        desvio(16, ParserSLR.NaoTerminal.CMD_COND, 26);
-        desvio(16, ParserSLR.NaoTerminal.DC, 22);
-        desvio(16, ParserSLR.NaoTerminal.TIPO, 24);
-        desvio(16, ParserSLR.NaoTerminal.VAR, 23);
-        desvio(21, ParserSLR.NaoTerminal.RESTO_IDENT, 32);
-        desvio(23, ParserSLR.NaoTerminal.MAIS_CMDS, 34);
-        desvio(24, ParserSLR.NaoTerminal.VARS, 36);
-        desvio(26, ParserSLR.NaoTerminal.CMD, 27);
-        desvio(26, ParserSLR.NaoTerminal.CMDS, 38);
-        desvio(26, ParserSLR.NaoTerminal.CMD_COND, 26);
-        desvio(26, ParserSLR.NaoTerminal.DC, 22);
-        desvio(26, ParserSLR.NaoTerminal.TIPO, 24);
-        desvio(26, ParserSLR.NaoTerminal.VAR, 23);
-        desvio(27, ParserSLR.NaoTerminal.MAIS_CMDS, 39);
-        desvio(28, ParserSLR.NaoTerminal.CONDICAO, 41);
-        desvio(28, ParserSLR.NaoTerminal.EXPRESSAO, 42);
-        desvio(28, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(28, ParserSLR.NaoTerminal.TERMO, 43);
-        desvio(29, ParserSLR.NaoTerminal.CONDICAO, 45);
-        desvio(29, ParserSLR.NaoTerminal.EXPRESSAO, 42);
-        desvio(29, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(29, ParserSLR.NaoTerminal.TERMO, 43);
-        desvio(30, ParserSLR.NaoTerminal.EXPRESSAO, 46);
-        desvio(30, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(30, ParserSLR.NaoTerminal.TERMO, 43);
-        desvio(31, ParserSLR.NaoTerminal.EXPRESSAO, 49);
-        desvio(31, ParserSLR.NaoTerminal.EXP_IDENT, 48);
-        desvio(31, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(31, ParserSLR.NaoTerminal.TERMO, 43);
-        desvio(33, ParserSLR.NaoTerminal.CMD, 27);
-        desvio(33, ParserSLR.NaoTerminal.CMDS, 50);
-        desvio(33, ParserSLR.NaoTerminal.CMD_COND, 26);
-        desvio(33, ParserSLR.NaoTerminal.DC, 22);
-        desvio(33, ParserSLR.NaoTerminal.TIPO, 24);
-        desvio(33, ParserSLR.NaoTerminal.VAR, 23);
-        desvio(35, ParserSLR.NaoTerminal.MAIS_VAR, 52);
-        desvio(42, ParserSLR.NaoTerminal.RELACAO, 61);
-        desvio(43, ParserSLR.NaoTerminal.OP_AD, 65);
-        desvio(43, ParserSLR.NaoTerminal.OUTROS_TERMOS, 64);
-        desvio(44, ParserSLR.NaoTerminal.FATOR, 69);
-        desvio(51, ParserSLR.NaoTerminal.VARS, 72);
-        desvio(61, ParserSLR.NaoTerminal.EXPRESSAO, 74);
-        desvio(61, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(61, ParserSLR.NaoTerminal.TERMO, 43);
-        desvio(65, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(65, ParserSLR.NaoTerminal.TERMO, 75);
-        desvio(68, ParserSLR.NaoTerminal.EXPRESSAO, 76);
-        desvio(68, ParserSLR.NaoTerminal.OP_UN, 44);
-        desvio(68, ParserSLR.NaoTerminal.TERMO, 43);
-        desvio(69, ParserSLR.NaoTerminal.MAIS_FATORES, 79);
-        desvio(69, ParserSLR.NaoTerminal.OP_MUL, 80);
-        desvio(73, ParserSLR.NaoTerminal.CMD, 27);
-        desvio(73, ParserSLR.NaoTerminal.CMDS, 82);
-        desvio(73, ParserSLR.NaoTerminal.CMD_COND, 26);
-        desvio(73, ParserSLR.NaoTerminal.DC, 22);
-        desvio(73, ParserSLR.NaoTerminal.TIPO, 24);
-        desvio(73, ParserSLR.NaoTerminal.VAR, 23);
-        desvio(75, ParserSLR.NaoTerminal.OP_AD, 65);
-        desvio(75, ParserSLR.NaoTerminal.OUTROS_TERMOS, 83);
-        desvio(80, ParserSLR.NaoTerminal.FATOR, 85);
-        desvio(81, ParserSLR.NaoTerminal.CMD, 27);
-        desvio(81, ParserSLR.NaoTerminal.CMDS, 86);
-        desvio(81, ParserSLR.NaoTerminal.CMD_COND, 26);
-        desvio(81, ParserSLR.NaoTerminal.DC, 22);
-        desvio(81, ParserSLR.NaoTerminal.TIPO, 24);
-        desvio(81, ParserSLR.NaoTerminal.VAR, 23);
-        desvio(85, ParserSLR.NaoTerminal.MAIS_FATORES, 88);
-        desvio(85, ParserSLR.NaoTerminal.OP_MUL, 80);
-        desvio(87, ParserSLR.NaoTerminal.PFALSA, 91);
-        desvio(92, ParserSLR.NaoTerminal.CMD, 27);
-        desvio(92, ParserSLR.NaoTerminal.CMDS, 93);
-        desvio(92, ParserSLR.NaoTerminal.CMD_COND, 26);
-        desvio(92, ParserSLR.NaoTerminal.DC, 22);
-        desvio(92, ParserSLR.NaoTerminal.TIPO, 24);
-        desvio(92, ParserSLR.NaoTerminal.VAR, 23);
+        // --- Trilha 7: Expressões Aritméticas, Termos, Fatores e Parênteses ---
+        adicionarReduce(40, 31); // R31: OP_UN -> -
+        configurarContinuacaoSoma(43, 64);  // Soma/subtração após o 1º termo
+        configurarInicioFator(44, 69);      // 1º fator do termo
+        adicionarReduce(62, 38); // R38: OP_AD -> +
+        adicionarReduce(63, 39); // R39: OP_AD -> -
+        adicionarReduce(64, 29); // R29: EXPRESSAO -> TERMO OUTROS_TERMOS
+        adicionarShift(65, MENOS, 40);      adicionarReduce(65, 32);
+        adicionarGoto(65, OP_UN, 44);       adicionarGoto(65, TERMO, 75);
+        adicionarReduce(66, 33); // R33: FATOR -> id
+        adicionarReduce(67, 34); // R34: FATOR -> numero_real
+        configurarInicioExpressao(68, 76);  // Expressão entre parênteses ( EXPRESSAO )
+        configurarContinuacaoMult(69, 79);  // Multiplicação/divisão após o 1º fator
+        configurarContinuacaoSoma(75, 83);  // Soma/subtração encadeada
+        adicionarShift(76, FECHA_PAR, 84);
+        adicionarReduce(77, 42); // R42: OP_MUL -> *
+        adicionarReduce(78, 43); // R43: OP_MUL -> /
+        adicionarReduce(79, 30); // R30: TERMO -> OP_UN FATOR MAIS_FATORES
+        configurarInicioFator(80, 85);      // Fator após '*' ou '/'
+        adicionarReduce(83, 36); // R36: OUTROS_TERMOS -> OP_AD TERMO OUTROS_TERMOS
+        adicionarReduce(84, 35); // R35: FATOR -> ( EXPRESSAO )
+        configurarContinuacaoMult(85, 88);  // Multiplicação/divisão encadeada
+        adicionarReduce(88, 40); // R40: MAIS_FATORES -> OP_MUL FATOR MAIS_FATORES
     }
 }

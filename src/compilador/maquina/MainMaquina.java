@@ -3,49 +3,54 @@ package compilador.maquina;
 import java.io.File;
 
 /**
- * Ponto de entrada oficial para a Parte 2 do Trabalho: Execucao da Maquina Hipotetica.
- * Le um arquivo de codigo objeto e simula a execucao da CPU virtual.
+ * PONTO DE ENTRADA DA PARTE 2 DO PROJETO: EXECUÇÃO DA MÁQUINA HIPOTÉTICA
+ * 
+ * O que esta classe faz?
+ * Lê o arquivo de código objeto gerado pelo compilador ("codigo.objeto.txt")
+ * e executa cada instrução dentro da Máquina Hipotética (MaquinaHipotetica).
  */
 public class MainMaquina {
     public static void main(String[] args) {
         String caminhoArquivo = "codigo.objeto.txt";
         boolean modoTrace = false;
 
-        for (String arg : args) {
-            if ("--trace".equalsIgnoreCase(arg) || "--debug".equalsIgnoreCase(arg)) {
+        // Lê os argumentos de linha de comando (ex: "--trace" para ver o passo a passo da pilha)
+        for (String argumento : args) {
+            if ("--trace".equalsIgnoreCase(argumento) || "--debug".equalsIgnoreCase(argumento)) {
                 modoTrace = true;
-            } else if (!arg.startsWith("-")) {
-                caminhoArquivo = arg;
+            } else if (!argumento.startsWith("-")) {
+                caminhoArquivo = argumento;
             }
         }
 
-        File arquivo = new File(caminhoArquivo);
+        File arquivoObjeto = new File(caminhoArquivo);
         System.out.println("==========================================================================");
         System.out.println("                   INTERPRETADOR DA MAQUINA HIPOTETICA                    ");
         System.out.println("==========================================================================");
-        System.out.println("Arquivo de programa: " + arquivo.getAbsolutePath());
+        System.out.println("Arquivo de programa: " + arquivoObjeto.getAbsolutePath());
         System.out.println("Modo Trace         : " + (modoTrace ? "ATIVADO (passo a passo)" : "DESATIVADO"));
         System.out.println("--------------------------------------------------------------------------");
 
         try {
-            MaquinaHipotetica vm = new MaquinaHipotetica();
-            vm.setModoTrace(modoTrace);
-            vm.carregarArquivo(caminhoArquivo);
+            MaquinaHipotetica maquinaVirtual = new MaquinaHipotetica();
+            maquinaVirtual.setModoTrace(modoTrace);
+            maquinaVirtual.carregarArquivo(caminhoArquivo);
 
-            System.out.printf("Programa carregado com sucesso! Total de instrucoes: %d%n", vm.getPrograma().size());
+            System.out.printf("Programa carregado com sucesso! Total de instrucoes: %d%n",
+                    maquinaVirtual.getPrograma().size());
             System.out.println("Iniciando execucao na CPU virtual...");
             System.out.println("--------------------------------------------------------------------------");
 
-            vm.executar();
+            maquinaVirtual.executar();
 
             System.out.println("\n--------------------------------------------------------------------------");
             System.out.println("Programa finalizado com SUCESSO na Maquina Hipotetica!");
             System.out.println("==========================================================================");
 
-        } catch (Exception e) {
+        } catch (Exception erroExecucao) {
             System.err.println("\n[FALHA NA EXECUCAO DA MAQUINA HIPOTETICA]");
-            System.err.println(e.getMessage());
-            e.printStackTrace();
+            System.err.println(erroExecucao.getMessage());
+            erroExecucao.printStackTrace();
             System.exit(1);
         }
     }

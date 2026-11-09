@@ -31,53 +31,54 @@ Aqui estão as explicações diretas e detalhadas sobre as linhas do código que
 
 ### 2. "Como o Lexer reconhece `System.out.println` e `lerDouble()`?"
 ```java
-if ("System".equals(lexema) && fonte.startsWith(".out.println", atual)) {
-    for (int i = 0; i < 12; i++) avancar(); // consome ".out.println" (12 caracteres)
-    return new Token(Tipo.PRINT, "System.out.println", linTok, colTok);
+if ("System".equals(palavra) && codigoFonte.startsWith(".out.println", posicaoAtual)) {
+    for (int i = 0; i < ".out.println".length(); i++) lerProximoCaractere();
+    return new Token(Tipo.PRINT, "System.out.println", linhaToken, colunaToken);
 }
-if ("lerDouble".equals(lexema) && fonte.startsWith("()", atual)) {
-    avancar(); // consome '('
-    avancar(); // consome ')'
-    return new Token(Tipo.LER_DOUBLE, "lerDouble()", linTok, colTok);
+if ("lerDouble".equals(palavra) && codigoFonte.startsWith("()", posicaoAtual)) {
+    lerProximoCaractere();
+    lerProximoCaractere();
+    return new Token(Tipo.LER_DOUBLE, "lerDouble()", linhaToken, colunaToken);
 }
 ```
 - Na gramática `lalg-java.txt`, `System.out.println` e `lerDouble()` são **terminais únicos** (a linguagem não tem orientação a objetos geral nem operador `.`).
 - Por isso, quando o `Lexer` lê a palavra `"System"`, ele verifica se os próximos 12 caracteres são `".out.println"`. Se forem, avança os 12 caracteres e retorna o token `PRINT`.
 - Da mesma forma, ao ler `"lerDouble"`, verifica se os próximos 2 caracteres são `"()"`, avança 2 vezes e retorna `LER_DOUBLE`.
 
-### 3. "O que faz o método `match(char esperado)` no `Lexer.java`?"
+### 3. "O que faz o método `consumirSeProximoFor(char esperado)` no `Lexer.java`?"
 - É o método de **Lookahead Condicional de 1 Caractere**:
-  - Ele olha o próximo caractere da string `fonte` sem avançar caso não seja o esperado.
-  - **Exemplo com `=` e `==`:** Quando o scanner lê `'='`, ele ainda não sabe se é atribuição (`=`) ou comparação de igualdade (`==`). Ele chama `match('=')`:
+  - Ele olha o próximo caractere da string `codigoFonte` sem avançar caso não seja o esperado.
+  - **Exemplo com `=` e `==`:** Quando o scanner lê `'='`, ele ainda não sabe se é atribuição (`=`) ou comparação de igualdade (`==`). Ele chama `consumirSeProximoFor('=')`:
     - Se o próximo caractere for `'='`, ele consome e retorna `Tipo.EQ` (`==`).
     - Se não for (ex: `= 10`), retorna `false` sem consumir o espaço/número e emite `Tipo.ATRIB` (`=`).
   - O mesmo vale para `!=`, `<=` e `>=`.
 
-### 4. "O que faz o método `reduce(int st, int regraId)` em `TabelaSLR.java`?"
+### 4. "O que faz o método `adicionarReduce(int estadoAtual, int numeroDaRegra)` em `TabelaSLR.java`?"
 ```java
-private void reduce(int st, int regraId) {
-    Regra r = regras.get(regraId);
-    for (Lexer.Tipo tokenFollow : follow.get(r.lhs)) {
-        tabelaAction.computeIfAbsent(st, k -> new HashMap<>()).put(tokenFollow, Acao.reduce(r));
+private void adicionarReduce(int estadoAtual, int numeroDaRegra) {
+    Regra regra = regrasDaGramatica.get(numeroDaRegra);
+    for (Lexer.Tipo tokenDoFollow : conjuntoFollow.get(regra.ladoEsquerdo)) {
+        tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())
+                    .put(tokenDoFollow, new Acao(AcaoTipo.REDUCE, 0, regra));
     }
 }
 ```
-- Esta linha é a **definição exata de um parser SLR(1)**:
-  - Quando um estado `st` completa uma regra $A \rightarrow \beta$ (`r`), o parser SLR(1) não reduz para qualquer token; ele só aplica `REDUCE` se o próximo token da entrada pertencer ao conjunto `FOLLOW(A)` (`follow.get(r.lhs)`).
-  - O laço percorre todos os tokens do `FOLLOW` do não-terminal à esquerda da regra e registra `Acao.reduce(r)` na tabela `ACTION`.
+- Esta função é a **definição exata de um parser SLR(1)**:
+  - Quando um estado `estadoAtual` completa uma regra $A \rightarrow \beta$ (`regra`), o parser SLR(1) não reduz para qualquer token; ele só aplica `REDUCE` se o próximo token da entrada pertencer ao conjunto `FOLLOW(A)` (`conjuntoFollow.get(regra.ladoEsquerdo)`).
+  - O laço percorre todos os tokens do `FOLLOW` do não-terminal à esquerda da regra (`ladoEsquerdo`) e registra a ação de redução na tabela `ACTION`.
 
-### 5. "Por que em `ParserSLR.java` usamos `no.filhos.add(0, (NoSintatico) pilha.pop())`?"
+### 5. "Por que em `ParserSLR.java` usamos `novoNoPai.filhos.add(0, pilhaDeNos.pop())`?"
 - Porque a pilha funciona em ordem **LIFO** (o último elemento empilhado é o primeiro a sair).
 - Quando reduzimos uma regra como `CONDICAO -> EXPRESSAO RELACAO EXPRESSAO`, desempilhamos da direita para a esquerda. Inserindo sempre no índice `0` da lista `filhos`, os filhos ficam ordenados corretamente da esquerda para a direita (`filho(0)`, `filho(1)`, `filho(2)`).
 
-### 6. "Por que em `TradutorCodigo.java` pegamos `raiz.getFilho(15)`?"
+### 6. "Por que em `AnalisadorSemantico.java` pegamos `noRaizProg.getFilho(15)`?"
 - Porque a regra 1 da gramática é:
   `PROG -> public(0) class(1) id(2) {(3) public(4) static(5) void(6) main(7) ((8) String(9) [(10) ](11) id(12) )(13) {(14) <CMDS>(15) }(16) }(17)`
 - Contando a partir do zero, o bloco `<CMDS>` do `main` é exatamente o filho de índice `15` do nó `PROG`.
 
-### 7. "Por que usamos `if (arg == arg.longValue())` no `toString()` da instrução?"
+### 7. "Por que usamos `if (argumento == argumento.longValue())` no `toString()` da instrução?"
 - Porque na Máquina Hipotética os argumentos são armazenados como `Double` (para aceitar tanto constantes reais como `3.14` quanto endereços inteiros como `0`, `1`, `32`).
-- Se o valor não possui casas decimais (ex: `4.0 == 4`), `arg.longValue()` formata como inteiro (`ALME 4`, `DSVF 32`) em vez de `ALME 4.0`. Se tiver casas decimais (`3.14`), imprime `CRCT 3.14`.
+- Se o valor não possui casas decimais (ex: `4.0 == 4`), `argumento.longValue()` formata como inteiro (`ALME 4`, `DSVF 32`) em vez de `ALME 4.0`. Se tiver casas decimais (`3.14`), imprime `CRCT 3.14`.
 
 ---
 
@@ -130,25 +131,25 @@ O analisador léxico converte o texto contínuo em tokens estruturados. A gramá
 - O analisador **ascendente (Bottom-Up)** faz o caminho inverso: ele lê os tokens (folhas) e vai agrupando-os até reconstruir a raiz `PROG`.
 - A técnica usada é o **Shift-Reduce (Desloca-Reduz)** baseada no algoritmo **SLR(1)** (*Simple LR com lookahead de 1 token*).
 
-### 2.2 O que é a Pilha Alternada do Parser SLR(1)?
-O parser mantém uma pilha onde estados e símbolos gramaticais alternam estritamente:
-$$\text{Pilha} = [0, X_1, s_1, X_2, s_2, \dots, X_m, s_m]$$
-- **O topo da pilha é sempre um estado numérico ($s_m$).**
+### 2.2 O que são as Duas Pilhas Sincronizadas do Parser SLR(1)?
+O parser mantém duas pilhas tipadas que caminham juntas (`pilhaDeEstados` e `pilhaDeNos`):
+$$\text{pilhaDeEstados} = [0, s_1, s_2, \dots, s_m], \quad \text{pilhaDeNos} = [X_1, X_2, \dots, X_m]$$
+- **O topo de `pilhaDeEstados` é sempre o estado atual ($s_m$).**
 - O estado inicial é sempre `0`.
 
 ### 2.3 As Quatro Ações do Autômato:
 1. **`SHIFT s'` (Deslocar):**
    - Consome o token atual da entrada.
-   - Empilha o símbolo do token.
-   - Empilha o novo estado $s'$.
-   - Avança para o próximo token.
-2. **`REDUCE A -> beta` (Reduzir):**
-   - Reconheceu que os símbolos no topo da pilha formam o lado direito de uma regra gramatical $A \rightarrow \beta$.
-   - **A PERGUNTA DE OURO:** *Por que desempilha $2 \times |\beta|$ elementos?*
-     - Resposta: Porque para cada um dos $|\beta|$ símbolos na pilha, existe também um estado empilhado logo acima dele. Logo, para remover $k$ símbolos, é necessário desempilhar $2k$ itens!
-   - Após desempilhar, o novo topo da pilha é o estado anterior $s_{\text{ant}}$.
+   - Empilha o nó folha do token em `pilhaDeNos`.
+   - Empilha o novo estado $s'$ (`acao.estadoDestino`) em `pilhaDeEstados`.
+   - Avança para o próximo token (`indiceTokenAtual++`).
+2. **`REDUCE ladoEsquerdo -> ladoDireito` (Reduzir):**
+   - Reconheceu que os símbolos no topo formam o `ladoDireito` de uma regra gramatical $A \rightarrow \beta$.
+   - **A PERGUNTA DE OURO:** *Por que desempilha `regra.ladoDireito.length` elementos de cada pilha?*
+     - Resposta: Porque para cada um dos $|\beta|$ símbolos empilhados em `pilhaDeNos`, foi empilhado um estado correspondente em `pilhaDeEstados`. Logo, para remover $k$ símbolos da regra, desempilhamos $k$ estados e $k$ nós filhos!
+   - Após desempilhar, o novo topo de `pilhaDeEstados` é o estado anterior $s_{\text{ant}}$.
    - O parser consulta a tabela de desvios: $s_{\text{novo}} = \text{GOTO}[s_{\text{ant}}, A]$.
-   - Empilha o não-terminal $A$ e o novo estado $s_{\text{novo}}$.
+   - Empilha o nó pai do não-terminal $A$ em `pilhaDeNos` e o novo estado $s_{\text{novo}}$ em `pilhaDeEstados`.
 3. **`ACCEPT` (Aceitar):**
    - Quando o autômato reduz a regra aumentada `START -> PROG` e o próximo token é `$`. O código é 100% válido!
 4. **`ERROR` (Erro):**
@@ -368,9 +369,9 @@ public class Teste {
 
 Aqui estão as 7 perguntas exatas que o professor/banca costuma fazer e como você deve responder:
 
-### Pergunta 1: *"Por que seu analisador ascendente desempilha $2 \times k$ elementos em cada redução?"*
+### Pergunta 1: *"Por que seu analisador ascendente usa duas pilhas sincronizadas (`pilhaDeEstados` e `pilhaDeNos`) e desempilha $k$ elementos em cada redução?"*
 > **Sua resposta:**  
-> "Porque a nossa pilha LR implementa a estrutura clássica que alterna símbolos gramaticais e estados numéricos: $[0, X_1, s_1, X_2, s_2, \dots]$. Para cada um dos $k$ símbolos da regra $A \rightarrow \beta$, existe um estado empilhado logo acima dele. Logo, para remover os $k$ símbolos da regra, precisamos desempilhar exatamente $2k$ elementos."
+> "Porque separamos a pilha clássica LR em duas pilhas tipadas que caminham juntas: `pilhaDeEstados` (guarda inteiros dos estados) e `pilhaDeNos` (guarda os nós da árvore sintática). Para cada um dos $k$ símbolos do `ladoDireito` da regra $A \rightarrow \beta$, existe um nó em `pilhaDeNos` e um estado correspondente em `pilhaDeEstados`. Na redução, desempilhamos $k$ elementos de cada uma."
 
 ### Pergunta 2: *"Como o parser sabe quando deve fazer Shift ou quando deve fazer Reduce?"*
 > **Sua resposta:**  

@@ -152,58 +152,30 @@ Linha  Instrução     Efeito na Pilha e Memória                               
 O interpretador executa um laço clássico de máquina de Von Neumann (Fetch-Decode-Execute):
 
 ```java
-int i = 0;   // Instruction Pointer
-int s = -1;  // Stack Pointer
+int i = 0;   // Registrador de Instrução (linha da próxima instrução)
+int s = -1;  // Registrador de Topo da Pilha M[]
 double[] M = new double[10000];
 
-while (i < programa.size()) {
-    Instrucao instr = programa.get(i);
-    i++; // Avanco por padrao para a proxima linha
+while (rodando && i >= 0 && i < programa.size()) {
+    int linhaAtual = i++; // Lê a linha atual e já avança 'i' para a próxima instrução
+    InstrucaoVM inst = programa.get(linhaAtual);
+    int argInt = (inst.argumento != null) ? inst.argumento.intValue() : 0;
 
-    switch (instr.getOpcode()) {
-        case "INPP":
-            s = -1;
-            break;
-        case "ALME":
-            s += (int) instr.getArgumento();
-            break;
-        case "CRCT":
-            M[++s] = instr.getArgumento();
-            break;
-        case "CRVL":
-            M[++s] = M[(int) instr.getArgumento()];
-            break;
-        case "ARMZ":
-            M[(int) instr.getArgumento()] = M[s--];
-            break;
-        case "SOMA":
-            M[s - 1] = M[s - 1] + M[s];
-            s--;
-            break;
-        case "SUBT":
-            M[s - 1] = M[s - 1] - M[s];
-            s--;
-            break;
-        case "CPMA":
-            M[s - 1] = (M[s - 1] > M[s]) ? 1.0 : 0.0;
-            s--;
-            break;
-        case "DSVI":
-            i = (int) instr.getArgumento();
-            break;
-        case "DSVF":
-            if (M[s--] == 0.0) {
-                i = (int) instr.getArgumento();
-            }
-            break;
-        case "LEIT":
-            M[++s] = scannerInput.nextDouble();
-            break;
-        case "IMPR":
-            System.out.println(M[s--]);
-            break;
-        case "PARA":
-            return;
+    switch (inst.operacao) {
+        case "INPP": s = -1; break;
+        case "ALME": s += argInt; break;
+        case "DESM": s -= argInt; break;
+        case "PARA": rodando = false; break;
+        case "CRCT": s++; M[s] = inst.argumento; break;
+        case "CRVL": s++; M[s] = M[argInt]; break;
+        case "ARMZ": M[argInt] = M[s]; s--; break;
+        case "SOMA": M[s - 1] = M[s - 1] + M[s]; s--; break;
+        case "SUBT": M[s - 1] = M[s - 1] - M[s]; s--; break;
+        case "CPMA": M[s - 1] = (M[s - 1] > M[s]) ? 1.0 : 0.0; s--; break;
+        case "DSVI": i = argInt; break;
+        case "DSVF": if (M[s] == 0.0) i = argInt; s--; break;
+        case "LEIT": s++; M[s] = teclado.nextDouble(); break;
+        case "IMPR": double val = M[s]; s--; System.out.println(val); break;
     }
 }
 ```

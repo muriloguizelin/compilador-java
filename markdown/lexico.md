@@ -78,7 +78,7 @@ O analisador léxico implementa o mapeamento estrito para os **33 terminais form
 
 ## 3. O Autômato Finito Determinístico (AFD)
 
-O Lexer opera como uma máquina de estados finitos que avança caractere a caractere com um cursor (`atual`) e um marcador de início de lexema (`inicio`).
+O Lexer opera como uma máquina de estados finitos que avança caractere a caractere com um cursor (`posicaoAtual`) e um marcador de início de palavra/número (`inicio`).
 
 ```
                 +-------------------+
@@ -120,7 +120,7 @@ O Lexer opera como uma máquina de estados finitos que avança caractere a carac
 
 ### 4.2 Reconhecimento de `lerDouble()`
 - Na gramática, `lerDouble()` é uma chamada atômica reservada permitida apenas à direita de uma atribuição (`EXP_IDENT -> lerDouble()`).
-- **Solução do AFD:** Ao encontrar o lexema `lerDouble`, o scanner verifica com `fonte.startsWith("()", atual)` a presença imediata dos parênteses `()`, avança 2 caracteres e emite o token `Tipo.LER_DOUBLE`.
+- **Solução do AFD:** Ao encontrar a palavra `lerDouble`, o scanner verifica com `codigoFonte.startsWith("()", posicaoAtual)` a presença imediata dos parênteses `()`, avança 2 caracteres com `lerProximoCaractere()` e emite o token `Tipo.LER_DOUBLE`.
 
 ### 4.3 Tratamento de Números (`NUMERO_REAL`)
 - A gramática opera exclusivamente sobre o tipo `double`.

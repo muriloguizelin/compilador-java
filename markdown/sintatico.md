@@ -128,24 +128,24 @@ A gramática foi submetida a teste automatizado de fechamento e análise de conf
 
 ## 4. O Funcionamento do Parser Shift-Reduce SLR(1)
 
-### 4.1 A Pilha de Análise Alternada
-O parser mantém uma pilha única onde estados inteiros e símbolos gramaticais alternam rigorosamente:
-$$\text{Pilha} = [0, X_1, s_1, X_2, s_2, \dots, X_m, s_m]$$
-- O topo da pilha é **sempre** o estado atual $s_m$.
-- O estado inicial da pilha é `0`.
+### 4.1 As Duas Pilhas Sincronizadas
+O parser mantém duas pilhas tipadas que caminham juntas (`pilhaDeEstados` e `pilhaDeNos`):
+$$\text{pilhaDeEstados} = [0, s_1, s_2, \dots, s_m], \quad \text{pilhaDeNos} = [X_1, X_2, \dots, X_m]$$
+- O topo de `pilhaDeEstados` é **sempre** o estado atual $s_m$.
+- O estado inicial de `pilhaDeEstados` é `0`.
 
 ### 4.2 As Ações do Autômato
 1. **Deslocamento (Shift $s'$):**
-   - Consome o token atual $a$ da fita.
-   - Empilha o símbolo $a$ e, logo em seguida, o novo estado $s'$.
+   - Consome o token atual $a$ da fita (`tokenAtual`).
+   - Empilha o nó folha de $a$ em `pilhaDeNos` e o novo estado $s'$ (`acao.estadoDestino`) em `pilhaDeEstados`.
 2. **Redução (Reduce $A \rightarrow \beta$):**
-   - Seja $k = |\beta|$ o número de símbolos no lado direito da regra.
-   - **Por que desempilha $2k$ elementos?** Porque para cada um dos $k$ símbolos da regra existe também um estado empilhado acima dele. Logo, desempilhar $2k$ elementos remove todos os símbolos de $\beta$ e seus respectivos estados.
-   - O novo topo da pilha revela o estado anterior $s_{\text{ant}}$.
+   - Seja $k = |\beta|$ (`regra.ladoDireito.length`) o número de símbolos no lado direito da regra.
+   - **Por que desempilha $k$ elementos de cada pilha?** Porque para cada um dos $k$ símbolos da regra empilhados em `pilhaDeNos` existe também um estado correspondente empilhado em `pilhaDeEstados`.
+   - O novo topo de `pilhaDeEstados` revela o estado anterior $s_{\text{ant}}$.
    - O parser consulta a tabela de desvios: $s_{\text{novo}} = \text{GOTO}[s_{\text{ant}}, A]$.
-   - Empilha o não-terminal $A$ e o novo estado $s_{\text{novo}}$.
+   - Empilha o nó pai do não-terminal $A$ em `pilhaDeNos` e o novo estado $s_{\text{novo}}$ em `pilhaDeEstados`.
 3. **Aceitação (Accept):**
-   - Ocorre quando o topo da pilha reconheceu `PROG` e o lookahead é `$`. O programa é sintaticamente válido!
+   - Ocorre quando o topo da pilha reconheceu `PROG` (Estado 2) e o lookahead é `$`. O programa é sintaticamente válido!
 4. **Erro:**
    - Ocorre se $\text{ACTION}[s, a]$ for vazio. Dispara `SyntacticException`.
 
@@ -153,15 +153,14 @@ $$\text{Pilha} = [0, X_1, s_1, X_2, s_2, \dots, X_m, s_m]$$
 
 ## 5. Diagnóstico e Tratamento de Erros Sintáticos
 
-Quando ocorre um erro sintático, o compilador não apenas rejeita a entrada, mas consulta dinamicamente a tabela `ACTION` no estado atual para listar **todos os tokens válidos esperados naquele ponto**.
+Quando ocorre um erro sintático, o compilador não apenas rejeita a entrada, mas consulta dinamicamente a tabela `ACTION` no estado atual (`obterTokensEsperados(estadoAtual)`) para listar **todos os tokens válidos esperados naquele ponto**.
 
 Exemplo real de erro gerado pelo compilador:
 ```text
 ==========================================================================
                        FALHA NA ANALISE SINTATICA                         
 ==========================================================================
-Erro Sintatico [Linha 4, Coluna 9]: Token inesperado 'a' (tipo: ID). (Estado SLR: 36)
-  Tokens esperados neste contexto: ';' (PONTO_VIRG), ',' (VIRGULA)
+Erro Sintatico na linha 5, coluna 12: Token inesperado 'a' (ID). Esperado: [ABRE_PAR]
 ==========================================================================
 ```
 
@@ -172,14 +171,14 @@ Erro Sintatico [Linha 4, Coluna 9]: Token inesperado 'a' (tipo: ID). (Estado SLR
 O analisador sintático é dividido de forma enxuta e modular em 2 arquivos no pacote `compilador`:
 
 - [ParserSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/ParserSLR.java):
-  - `ParserSLR.NaoTerminal`: Enum com os 24 não-terminais da gramática.
-  - `ParserSLR.NoSintatico`: Nó da Árvore Sintática Concreta (CST), podendo ser folha (`token != null`) ou nó interno (`nt != null` e lista `filhos`).
+  - `ParserSLR.NaoTerminal`: Enum com os 24 não-terminais da gramática (todos comentados).
+  - `ParserSLR.NoSintatico`: Nó da Árvore Sintática Concreta (CST), podendo ser folha (`token != null`) ou nó interno (`naoTerminal != null` e lista `filhos`).
   - `ParserSLR.SyntacticException`: Exceção detalhada com linha, coluna, token inesperado e lista de tokens esperados.
-  - `ParserSLR.analisar(tokens)`: Motor de execução da pilha alternada Shift-Reduce.
+  - `ParserSLR.analisar(tokens)`: Motor de execução Shift-Reduce com `pilhaDeEstados` e `pilhaDeNos`.
 - [TabelaSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java):
-  - `TabelaSLR.Regra`: Representa uma produção $A \rightarrow \beta$ com `id`, `lhs` e array `rhs`.
+  - `TabelaSLR.Regra`: Representa uma produção $A \rightarrow \beta$ com `numeroRegra`, `ladoEsquerdo` e array `ladoDireito`.
   - `TabelaSLR.Acao` e `TabelaSLR.AcaoTipo`: Representam as transições `SHIFT`, `REDUCE`, `ACCEPT` e `ERROR`.
-  - `definirGramatica()`, `carregarFirstPredefinido()`, `carregarFollowPredefinido()`, `carregarActionPredefinido()` e `carregarGotoPredefinido()`: Carregam a gramática formal e os 95 estados canônicos, aplicando `FOLLOW(lhs)` nas reduções via `reduce(estado, regraId)`.
+  - `definirGramatica()`, `carregarFirstFollow()` e `carregarEstadosSLR()`: Carregam a gramática formal e os 95 estados canônicos usando os 5 métodos de padrões (`configurarHubDeComandos`, `configurarInicioExpressao`, `configurarInicioFator`, `configurarContinuacaoSoma`, `configurarContinuacaoMult`) e aplicando `FOLLOW(ladoEsquerdo)` nas reduções via `adicionarReduce(estadoAtual, numeroDaRegra)`.
 
 ---
 

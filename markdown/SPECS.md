@@ -161,30 +161,29 @@ Como o requisito é um **compilador ascendente**, o algoritmo clássico a ser ad
 ### 4.1 Estrutura do Parser
 
 O parser mantém:
-- Uma **Pilha de Estados e Símbolos**: `[0, s1, X1, s2, X2, ...]`.
-- Uma **Tabela de Ação (Action Table)**: `ACTION[estado, terminal] -> Shift(s) | Reduce(r) | Accept | Error`.
-- Uma **Tabela de Desvios (Goto Table)**: `GOTO[estado, não-terminal] -> novo_estado`.
+- Duas **Pilhas Sincronizadas e Tipadas**: `pilhaDeEstados` (`[0, s1, s2, ...]`) e `pilhaDeNos` (`[X1, X2, ...]`).
+- Uma **Tabela de Ação (Action Table)**: `ACTION[estadoAtual, tipoDoToken] -> SHIFT(estadoDestino) | REDUCE(regraParaReduzir) | ACCEPT | ERROR`.
+- Uma **Tabela de Desvios (Goto Table)**: `GOTO[estadoAtual, naoTerminal] -> proximoEstado`.
 
 ### 4.2 Algoritmo de Execução
 
 ```text
-1. Inicializar pilha com estado inicial 0.
-2. Seja 'a' o primeiro token retornado pelo léxico.
+1. Inicializar pilhaDeEstados com o estado inicial 0 (e pilhaDeNos vazia).
+2. Seja 'tokenAtual' o primeiro token retornado pelo léxico.
 3. Enquanto não aceitar:
-   s = topo da pilha
-   se ACTION[s, a] == Shift(s'):
-       empilha 'a'
-       empilha s'
-       a = próximo token do léxico
-   senão se ACTION[s, a] == Reduce(A -> beta):
-       desempilha 2 * |beta| elementos da pilha
-       s' = topo da pilha
-       empilha A
-       empilha GOTO[s', A]
-       executa ações semânticas associadas à regra A -> beta
-   senão se ACTION[s, a] == Accept:
-       sucesso na compilação!
-       retorna
+   estadoAtual = topo de pilhaDeEstados
+   se ACTION[estadoAtual, tokenAtual] == SHIFT(estadoDestino):
+       empilha 'tokenAtual' em pilhaDeNos
+       empilha 'estadoDestino' em pilhaDeEstados
+       tokenAtual = próximo token do léxico
+   senão se ACTION[estadoAtual, tokenAtual] == REDUCE(ladoEsquerdo -> ladoDireito):
+       desempilha |ladoDireito| estados de pilhaDeEstados
+       desempilha |ladoDireito| nós filhos de pilhaDeNos (montando novoNoPai)
+       topo = topo atual de pilhaDeEstados
+       empilha novoNoPai em pilhaDeNos
+       empilha GOTO[topo, ladoEsquerdo] em pilhaDeEstados
+   senão se ACTION[estadoAtual, tokenAtual] == ACCEPT:
+       sucesso na compilação! Retorna a raiz de pilhaDeNos
    senão:
        erro sintático: reporta linha, coluna e tokens esperados
 ```
@@ -358,6 +357,6 @@ compilador-java/
   - [x] Entrada (`LEIT`) e saída (`IMPR`) funcionando no terminal.
   - [x] Modo Trace passo a passo para depuração visual da CPU virtual (`--trace`).
 - [x] **Apresentação e Entrega:**
-  - [x] Arquitetura enxuta e clara (7 arquivos bem delimitados).
-  - [x] Guia definitivo de defesa oral disponível em `GUIA_DEFESA_ORAL.md`.
+  - [x] Arquitetura enxuta e clara (8 arquivos Java bem delimitados e comentados).
+  - [x] Guia definitivo de defesa oral disponível em `GUIA_DEFESA_ORAL.md` e `PERGUNTAS_E_DUVIDAS_CODEBASE.md`.
   - [x] Declaração explícita de uso de IA incluída.

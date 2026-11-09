@@ -3,34 +3,66 @@ package compilador;
 import java.util.*;
 
 /**
- * Analisador Sintatico Ascendente SLR(1) (Shift-Reduce).
- * Executa o automato com pilha consultando as tabelas ACTION e GOTO em TabelaSLR.
+ * FASE 2: ANALISADOR SINTÁTICO ASCENDENTE SLR(1) (Shift-Reduce)
+ * 
+ * O que esta classe faz?
+ * Recebe a lista de Tokens gerada pelo Lexer, verifica se a ordem segue a gramática
+ * consultando a TabelaSLR e monta de baixo para cima a Árvore Sintática do programa.
  */
 public class ParserSLR {
 
+    /**
+     * Símbolos Não-Terminais da gramática (representam os blocos/estruturas da linguagem).
+     */
     public enum NaoTerminal {
-        START, PROG, DC, VAR, VARS, MAIS_VAR, TIPO, CMDS, MAIS_CMDS, CMD_COND,
-        CMD, PFALSA, RESTO_IDENT, EXP_IDENT, CONDICAO, RELACAO, EXPRESSAO,
-        TERMO, OP_UN, FATOR, OUTROS_TERMOS, OP_AD, MAIS_FATORES, OP_MUL
+        START,          // Símbolo inicial da gramática aumentada (START -> PROG)
+        PROG,           // Programa completo (public class ... { public static void main ... })
+        DC,             // Declaração de variáveis seguida de mais comandos
+        VAR,            // Uma linha de declaração de variáveis (ex: double a, b)
+        VARS,           // Lista de nomes de variáveis (ex: a, b, c)
+        MAIS_VAR,       // Continuação da lista de variáveis após uma vírgula (ex: , b)
+        TIPO,           // Tipo da variável (sempre 'double')
+        CMDS,           // Bloco de comandos (declarações, atribuições, if, while, print)
+        MAIS_CMDS,      // Ponto-e-vírgula (;) seguido do restante dos comandos
+        CMD_COND,       // Comando de bloco condicional (if) ou repetição (while)
+        CMD,            // Comando simples (atribuição de variável ou System.out.println)
+        PFALSA,         // Parte Falsa do if (bloco opcional 'else { ... }')
+        RESTO_IDENT,    // Resto de um comando que começa com variável ('=' e valor atribuído)
+        EXP_IDENT,      // Valor atribuído após o '=' (uma EXPRESSAO matemática ou lerDouble())
+        CONDICAO,       // Comparação booleana dentro do if ou while (ex: a > b)
+        RELACAO,        // Operador de comparação (==, !=, >=, <=, >, <)
+        EXPRESSAO,      // Conta matemática envolvendo soma (+) e subtração (-)
+        TERMO,          // Conta matemática envolvendo multiplicação (*) e divisão (/)
+        OP_UN,          // Operador Unário: sinal negativo opcional antes de um valor (ex: -10)
+        FATOR,          // Elemento básico de uma conta: variável, número ou ( EXPRESSAO )
+        OUTROS_TERMOS,  // Continuação de somas e subtrações (+ TERMO ou - TERMO)
+        OP_AD,          // Operador de Adição (+) ou Subtração (-)
+        MAIS_FATORES,   // Continuação de multiplicações e divisões (* FATOR ou / FATOR)
+        OP_MUL          // Operador de Multiplicação (*) ou Divisão (/)
     }
 
+    /**
+     * Nó da Árvore Sintática: pode ser uma Folha (guarda um Token) ou um Nó Interno (guarda um NaoTerminal e filhos).
+     */
     public static class NoSintatico {
-        public final NaoTerminal nt;
+        public final NaoTerminal naoTerminal;
         public final Lexer.Token token;
         public final List<NoSintatico> filhos = new ArrayList<>();
 
-        public NoSintatico(NaoTerminal nt) { this.nt = nt; this.token = null; }
-        public NoSintatico(Lexer.Token token) { this.nt = null; this.token = token; }
+        public NoSintatico(NaoTerminal naoTerminal) { this.naoTerminal = naoTerminal; this.token = null; }
+        public NoSintatico(Lexer.Token token)       { this.naoTerminal = null; this.token = token; }
 
-        public boolean ehFolha() { return token != null; }
-        public NoSintatico getFilho(int i) { return (i >= 0 && i < filhos.size()) ? filhos.get(i) : null; }
-        public int getQtdFilhos() { return filhos.size(); }
+        public boolean ehFolha()             { return token != null; }
+        public Lexer.Tipo getTipoToken()     { return token != null ? token.tipo : null; }
+        public String getLexema()            { return token != null ? token.lexema : ""; }
+        public NoSintatico getFilho(int i)   { return (i >= 0 && i < filhos.size()) ? filhos.get(i) : null; }
+        public int getQtdFilhos()            { return filhos.size(); }
     }
 
     public static class SyntacticException extends RuntimeException {
         public final int linha, coluna;
-        public SyntacticException(String msg, int linha, int coluna) {
-            super(String.format("Erro Sintatico na linha %d, coluna %d: %s", linha, coluna, msg));
+        public SyntacticException(String mensagem, int linha, int coluna) {
+            super(String.format("Erro Sintatico na linha %d, coluna %d: %s", linha, coluna, mensagem));
             this.linha = linha;
             this.coluna = coluna;
         }
@@ -52,65 +84,64 @@ public class ParserSLR {
 
     public void setModoDepuracao(boolean debug) { this.modoDebug = debug; }
 
+    /**
+     * Executa o autômato com pilha SLR(1) (Shift-Reduce).
+     */
     public ResultadoParser analisar(List<Lexer.Token> tokens) {
-        if (modoDebug) {
-            tabela.imprimirFirstFollow();
-        }
+        if (modoDebug) tabela.imprimirFirstFollow();
 
-        // Pilha alternada: [estado_0, NoSintatico_1, estado_1, NoSintatico_2, estado_2, ...]
-        Deque<Object> pilha = new ArrayDeque<>();
-        pilha.push(0); // Estado inicial do automato LR(0)
+        Deque<Integer> pilhaDeEstados = new ArrayDeque<>();
+        Deque<NoSintatico> pilhaDeNos = new ArrayDeque<>();
+        pilhaDeEstados.push(0); // Começa no Estado 0
 
-        int ip = 0;
-        int passos = 0, shifts = 0, reduces = 0;
+        int indiceTokenAtual = 0, passos = 0, totalShifts = 0, totalReduces = 0;
 
         while (true) {
             passos++;
-            int s = (Integer) pilha.peek();
-            Lexer.Token a = tokens.get(ip);
-
-            TabelaSLR.Acao acao = tabela.obterAcao(s, a.tipo);
+            int estadoAtual = pilhaDeEstados.peek();
+            Lexer.Token tokenAtual = tokens.get(indiceTokenAtual);
+            TabelaSLR.Acao acao = tabela.obterAcao(estadoAtual, tokenAtual.tipo);
 
             if (modoDebug) {
-                System.out.printf("Passo %-4d | Estado %-3d | Token %-15s | Acao: %s%n", passos, s, a.lexema, acao.tipo);
+                System.out.printf("Passo %-4d | Estado %-3d | Token %-15s | Acao: %s%n",
+                        passos, estadoAtual, tokenAtual.lexema, acao.tipo);
             }
 
             switch (acao.tipo) {
                 case SHIFT:
-                    shifts++;
-                    pilha.push(new NoSintatico(a)); // empilha simbolo terminal (folha)
-                    pilha.push(acao.valor);         // empilha novo estado
-                    ip++;                           // avanca para o proximo token da fita
+                    // Empilha o token lido, avança para o novo estado e passa para o próximo token
+                    totalShifts++;
+                    pilhaDeNos.push(new NoSintatico(tokenAtual));
+                    pilhaDeEstados.push(acao.estadoDestino);
+                    indiceTokenAtual++;
                     break;
 
                 case REDUCE:
-                    reduces++;
-                    TabelaSLR.Regra r = acao.regra;
-                    NoSintatico no = new NoSintatico(r.lhs);
+                    // Agrupa os filhos do ladoDireito da regra dentro de um novo nó (ladoEsquerdo)
+                    totalReduces++;
+                    TabelaSLR.Regra regra = acao.regraParaReduzir;
+                    NoSintatico novoNoPai = new NoSintatico(regra.ladoEsquerdo);
 
-                    // Desempilha 2 * |rhs| elementos (para cada simbolo da regra, remove o estado e o no)
-                    for (int k = 0; k < r.rhs.length; k++) {
-                        pilha.pop(); // desempilha estado
-                        no.filhos.add(0, (NoSintatico) pilha.pop()); // insere no inicio para manter ordem esquerda->direita
+                    for (int k = 0; k < regra.ladoDireito.length; k++) {
+                        pilhaDeEstados.pop();
+                        novoNoPai.filhos.add(0, pilhaDeNos.pop());
                     }
 
-                    int topoEstado = (Integer) pilha.peek();
-                    Integer proxEstado = tabela.obterGoto(topoEstado, r.lhs);
-                    pilha.push(no);         // empilha o nao-terminal reduzido
-                    pilha.push(proxEstado); // empilha o estado destino da tabela GOTO
+                    int proximoEstado = tabela.obterGoto(pilhaDeEstados.peek(), regra.ladoEsquerdo);
+                    pilhaDeNos.push(novoNoPai);
+                    pilhaDeEstados.push(proximoEstado);
                     break;
 
                 case ACCEPT:
-                    pilha.pop(); // desempilha estado final (2)
-                    NoSintatico noProg = (NoSintatico) pilha.pop(); // desempilha a raiz PROG
-                    return new ResultadoParser(noProg, passos, shifts, reduces);
+                    // Fim do arquivo ($) atingido no Estado 2: retorna a raiz PROG da árvore!
+                    return new ResultadoParser(pilhaDeNos.pop(), passos, totalShifts, totalReduces);
 
                 case ERROR:
                 default:
-                    Set<Lexer.Tipo> esperados = tabela.obterTokensEsperados(s);
                     throw new SyntacticException(
-                            "Token inesperado '" + a.lexema + "' (" + a.tipo + "). Esperado: " + esperados,
-                            a.linha, a.coluna);
+                            "Token inesperado '" + tokenAtual.lexema + "' (" + tokenAtual.tipo +
+                            "). Esperado: " + tabela.obterTokensEsperados(estadoAtual),
+                            tokenAtual.linha, tokenAtual.coluna);
             }
         }
     }

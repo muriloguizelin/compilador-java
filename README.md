@@ -45,11 +45,11 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
 - **Tratamento de Símbolos Compostos:** Identifica palavras-chave (`public`, `class`, `double`, `if`, etc.), identificadores, números reais, operadores compostos (`==`, `!=`, `>=`, `<=`) e comandos específicos da linguagem (`System.out.println` e `lerDouble()`). Espaços e comentários (`//` e `/* ... */`) são descartados sem gerar tokens.
 
 ### 2. Analisador Sintático Ascendente SLR(1) (`ParserSLR.java` e `TabelaSLR.java`)
-- **Implementação:** Analisador sintático ascendente (Shift-Reduce) operando com pilha alternada de estados e nós sintáticos consultando a tabela SLR(1).
+- **Implementação:** Analisador sintático ascendente (Shift-Reduce) operando com duas pilhas sincronizadas e tipadas (`pilhaDeEstados` e `pilhaDeNos`) consultando a tabela SLR(1).
 - **Decisão sobre as Tabelas ACTION, GOTO e Conjuntos FIRST/FOLLOW:**
   - A gramática do trabalho possui 23 não-terminais (24 com `START`), 44 regras de produção e 95 estados canônicos LR(0).
-  - Como a gramática da linguagem é fixa e imutável (`lalg-java.txt`), os conjuntos `FIRST`, `FOLLOW` e os estados de transição `ACTION` e `GOTO` foram pré-definidos diretamente em `TabelaSLR.java`.
-  - Seguindo a definição formal do SLR(1), o método `reduce(estado, regraId)` utiliza diretamente o conjunto `FOLLOW(A)` do não-terminal à esquerda da regra para preencher as reduções válidas daquele estado.
+  - Como a gramática da linguagem é fixa e imutável (`lalg-java.txt`), os conjuntos `FIRST`, `FOLLOW` e os estados de transição `ACTION` e `GOTO` foram pré-definidos diretamente em `TabelaSLR.java`, organizados através de 5 métodos de padrões reutilizáveis (`configurarHubDeComandos`, `configurarInicioExpressao`, `configurarInicioFator`, `configurarContinuacaoSoma` e `configurarContinuacaoMult`).
+  - Seguindo a definição formal do SLR(1), o método `adicionarReduce(estadoAtual, numeroDaRegra)` utiliza diretamente o conjunto `FOLLOW(ladoEsquerdo)` do não-terminal à esquerda da regra para preencher as reduções válidas daquele estado.
 - **Ausência de Conflitos:** A gramática fornecida (`lalg-java.txt`) foi formalmente validada e pertence estritamente à classe SLR(1), apresentando 0 conflitos Shift/Reduce e 0 conflitos Reduce/Reduce. O uso explícito de blocos delimitados por chaves `{ ... }` em comandos `if` e `else` elimina o problema clássico de *dangling else*.
 
 ### 3. Analisador Semântico (`AnalisadorSemantico.java`)
@@ -82,7 +82,10 @@ compilador-java/
 ├── lalg-java.txt                    # Gramática original da linguagem
 ├── descricao.txt                    # Enunciado oficial do trabalho
 ├── codigo.objeto.txt                # Arquivo gerado pelo compilador para a VM
-├── compilador_slr1.excalidraw       # Diagrama visual completo do autômato e tabela SLR(1)
+├── compilador_slr1.excalidraw       # Diagrama visual completo (arquitetura + 95 estados desenhados)
+├── apresentacao_slides.html         # Apresentação interativa de 24 slides com roteiro de fala
+├── slides_compilador_slr1.pdf       # Versão em PDF de alta resolução dos 24 slides
+├── video_explicacao_projeto.mp4     # Vídeo-aula narrada explicando toda a teoria e os 8 arquivos Java
 ├── exemplos/                        # Casos de teste válidos e programas com erros
 │   ├── correto.java.txt
 │   ├── erro_lexico.java.txt
@@ -94,6 +97,7 @@ compilador-java/
 │   ├── SPECS.md
 │   ├── GUIA_DEFESA_ORAL.md
 │   ├── GUIA_ESTUDOS_COMPLETO.md
+│   ├── PERGUNTAS_E_DUVIDAS_CODEBASE.md
 │   ├── lexico.md
 │   ├── sintatico.md
 │   ├── semantico.md

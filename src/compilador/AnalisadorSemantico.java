@@ -3,15 +3,20 @@ package compilador;
 import java.util.*;
 
 /**
- * Analisador Semantico da linguagem lalg-java.
- * Responsavel pela validacao de declaracao previa, unicidade de escopo e enderecamento de memoria.
+ * FASE 3: ANALISADOR SEMÂNTICO E TABELA DE SÍMBOLOS
+ * 
+ * O que esta classe faz?
+ * Percorre os comandos do programa para garantir duas regras de sentido (semânticas):
+ * 1. Nenhuma variável pode ser declarada duas vezes (unicidade).
+ * 2. Nenhuma variável pode ser usada sem ter sido declarada antes (declaração prévia).
+ * Também numera cada variável com seu endereço de memória (0, 1, 2...) na Tabela de Símbolos.
  */
 public class AnalisadorSemantico {
 
     public static class Simbolo {
         public final String nome;
         public final String tipo;
-        public final int endereco;
+        public final int endereco; // Posição na memória M[] da Máquina Hipotética (0, 1, 2...)
         public final int linha, coluna;
 
         public Simbolo(String nome, String tipo, int endereco, int linha, int coluna) {
@@ -25,44 +30,44 @@ public class AnalisadorSemantico {
 
     public static class SemanticException extends RuntimeException {
         public final int linha, coluna;
-        public SemanticException(String msg, int linha, int coluna) {
-            super(String.format("Erro Semantico na linha %d, coluna %d: %s", linha, coluna, msg));
+        public SemanticException(String mensagem, int linha, int coluna) {
+            super(String.format("Erro Semantico na linha %d, coluna %d: %s", linha, coluna, mensagem));
             this.linha = linha;
             this.coluna = coluna;
         }
     }
 
     public static class TabelaSimbolos {
-        private final Map<String, Simbolo> variaveis = new LinkedHashMap<>();
+        private final Map<String, Simbolo> variaveisDeclaradas = new LinkedHashMap<>();
 
-        public Simbolo inserir(String nome, String tipo, int linha, int coluna) {
-            if (variaveis.containsKey(nome)) {
-                Simbolo anterior = variaveis.get(nome);
+        public Simbolo inserir(Lexer.Token tokenVariavel) {
+            String nome = tokenVariavel.lexema;
+            if (variaveisDeclaradas.containsKey(nome)) {
+                Simbolo anterior = variaveisDeclaradas.get(nome);
                 throw new SemanticException(
                         String.format("Variavel '%s' ja declarada anteriormente na linha %d", nome, anterior.linha),
-                        linha, coluna);
+                        tokenVariavel.linha, tokenVariavel.coluna);
             }
-            Simbolo s = new Simbolo(nome, tipo, variaveis.size(), linha, coluna);
-            variaveis.put(nome, s);
-            return s;
+            Simbolo novo = new Simbolo(nome, "double", variaveisDeclaradas.size(), tokenVariavel.linha, tokenVariavel.coluna);
+            variaveisDeclaradas.put(nome, novo);
+            return novo;
         }
 
-        public Simbolo verificarDeclarada(String nome, int linha, int coluna) {
-            Simbolo s = variaveis.get(nome);
-            if (s == null) {
+        public void verificarDeclarada(Lexer.Token tokenVariavel) {
+            String nome = tokenVariavel.lexema;
+            if (!variaveisDeclaradas.containsKey(nome)) {
                 throw new SemanticException(
                         String.format("Variavel '%s' utilizada sem declaracao previa", nome),
-                        linha, coluna);
+                        tokenVariavel.linha, tokenVariavel.coluna);
             }
-            return s;
         }
 
-        public int obterEndereco(String nome) {
-            return variaveis.get(nome).endereco;
+        public int obterEndereco(String nomeVariavel) {
+            return variaveisDeclaradas.get(nomeVariavel).endereco;
         }
 
         public int getTotalVariaveis() {
-            return variaveis.size();
+            return variaveisDeclaradas.size();
         }
 
         public void imprimirTabela() {
@@ -71,10 +76,10 @@ public class AnalisadorSemantico {
             System.out.println("--------------------------------------------------------------------------");
             System.out.printf("%-5s | %-13s | %-8s | %-10s | %-12s%n", "#", "Identificador", "Tipo", "Endereco", "Posicao");
             System.out.println("------+---------------+----------+------------+-------------");
-            int idx = 1;
-            for (Simbolo s : variaveis.values()) {
+            int ordem = 1;
+            for (Simbolo s : variaveisDeclaradas.values()) {
                 System.out.printf("%-5d | %-13s | %-8s | %-10d | %d:%d%n",
-                        idx++, s.nome, s.tipo, s.endereco, s.linha, s.coluna);
+                        ordem++, s.nome, s.tipo, s.endereco, s.linha, s.coluna);
             }
             System.out.println("--------------------------------------------------------------------------");
         }
@@ -82,54 +87,47 @@ public class AnalisadorSemantico {
 
     private final TabelaSimbolos tabela = new TabelaSimbolos();
 
-    public TabelaSimbolos analisar(ParserSLR.NoSintatico raiz) {
-        percorrer(raiz);
+    public TabelaSimbolos analisar(ParserSLR.NoSintatico noRaizProg) {
+        // O filho 15 de PROG é o bloco <CMDS> dentro do método main
+        percorrerComandos(noRaizProg.getFilho(15));
         return tabela;
     }
 
-    // Percorre a arvore sintatica em pre-ordem, garantindo que toda variavel seja declarada ANTES de ser usada
-    private void percorrer(ParserSLR.NoSintatico no) {
+    /**
+     * Percorre a árvore de comandos na ordem do código:
+     * - Se encontrar um nó VAR ("double a, b;"), cadastra todas as variáveis declaradas nele.
+     * - Se encontrar qualquer outro token ID no meio dos comandos, verifica se já foi declarado!
+     */
+    private void percorrerComandos(ParserSLR.NoSintatico no) {
         if (no == null) return;
 
-        // 1. Declaracao de variaveis: VAR -> TIPO VARS
-        if (no.nt == ParserSLR.NaoTerminal.VAR) {
-            cadastrarVariaveis(no.getFilho(1));
+        // 1. Declaração de variáveis (VAR -> TIPO VARS)
+        if (no.naoTerminal == ParserSLR.NaoTerminal.VAR) {
+            cadastrarVariaveis(no);
             return;
         }
 
-        // 2. Uso no lado esquerdo de atribuicao: CMD -> id RESTO_IDENT
-        if (no.nt == ParserSLR.NaoTerminal.CMD && no.getQtdFilhos() >= 2) {
-            ParserSLR.NoSintatico f0 = no.getFilho(0);
-            if (f0.ehFolha() && f0.token.tipo == Lexer.Tipo.ID) {
-                tabela.verificarDeclarada(f0.token.lexema, f0.token.linha, f0.token.coluna);
-            }
-        }
-
-        // 3. Uso em expressao ou condicao: FATOR -> id
-        if (no.nt == ParserSLR.NaoTerminal.FATOR && no.getQtdFilhos() == 1) {
-            ParserSLR.NoSintatico f0 = no.getFilho(0);
-            if (f0.ehFolha() && f0.token.tipo == Lexer.Tipo.ID) {
-                tabela.verificarDeclarada(f0.token.lexema, f0.token.linha, f0.token.coluna);
-            }
+        // 2. Uso de variável (seja recebendo '=' ou dentro de uma conta/condição)
+        if (no.getTipoToken() == Lexer.Tipo.ID) {
+            tabela.verificarDeclarada(no.token);
+            return;
         }
 
         for (ParserSLR.NoSintatico filho : no.filhos) {
-            percorrer(filho);
+            percorrerComandos(filho);
         }
     }
 
-    private void cadastrarVariaveis(ParserSLR.NoSintatico noVars) {
-        if (noVars == null) return;
-        // VARS -> id MAIS_VAR
-        ParserSLR.NoSintatico noId = noVars.getFilho(0);
-        if (noId != null && noId.ehFolha() && noId.token.tipo == Lexer.Tipo.ID) {
-            Lexer.Token tok = noId.token;
-            tabela.inserir(tok.lexema, "double", tok.linha, tok.coluna);
+    /**
+     * Cadastra na Tabela de Símbolos todos os nomes de variáveis (tokens ID) dentro de um bloco VAR.
+     */
+    private void cadastrarVariaveis(ParserSLR.NoSintatico no) {
+        if (no == null) return;
+        if (no.getTipoToken() == Lexer.Tipo.ID) {
+            tabela.inserir(no.token);
         }
-        ParserSLR.NoSintatico noMaisVar = noVars.getFilho(1);
-        if (noMaisVar != null && noMaisVar.getQtdFilhos() >= 2) {
-            // MAIS_VAR -> , VARS
-            cadastrarVariaveis(noMaisVar.getFilho(1));
+        for (ParserSLR.NoSintatico filho : no.filhos) {
+            cadastrarVariaveis(filho);
         }
     }
 }
