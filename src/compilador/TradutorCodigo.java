@@ -71,8 +71,6 @@ public class TradutorCodigo {
      * Percorre um bloco da árvore procurando comandos simples (CMD) e condicionais/laços (CMD_COND).
      */
     private void traduzirBlocoComandos(ParserSLR.NoSintatico no) {
-        if (no == null) return;
-
         if (no.naoTerminal == ParserSLR.NaoTerminal.CMD) {
             traduzirComandoSimples(no);
             return;
@@ -152,7 +150,7 @@ public class TradutorCodigo {
 
         switch (noCondicao.getFilho(1).getFilho(0).getTipoToken()) {
             case EQ: emitir("CPIG"); break; // == (Comparar Igual)
-            case NE: emitir("CDIF"); break; // != (Comparar Diferente)
+            case NE: emitir("CDES"); break; // != (Comparar Desigualdade)
             case GE: emitir("CMAI"); break; // >= (Comparar Maior ou Igual)
             case LE: emitir("CPMI"); break; // <= (Comparar Menor ou Igual)
             case GT: emitir("CPMA"); break; // >  (Comparar Maior)
@@ -169,7 +167,7 @@ public class TradutorCodigo {
 
     private void traduzirOutrosTermos(ParserSLR.NoSintatico noOutros) {
         // OUTROS_TERMOS -> OP_AD TERMO OUTROS_TERMOS | vazio
-        if (noOutros == null || noOutros.getQtdFilhos() == 0) return;
+        if (noOutros.getQtdFilhos() == 0) return;
         traduzirTermo(noOutros.getFilho(1));
 
         Lexer.Tipo op = noOutros.getFilho(0).getFilho(0).getTipoToken();
@@ -190,7 +188,7 @@ public class TradutorCodigo {
 
     private void traduzirMaisFatores(ParserSLR.NoSintatico noMaisFatores) {
         // MAIS_FATORES -> OP_MUL FATOR MAIS_FATORES | vazio
-        if (noMaisFatores == null || noMaisFatores.getQtdFilhos() == 0) return;
+        if (noMaisFatores.getQtdFilhos() == 0) return;
         traduzirFator(noMaisFatores.getFilho(1));
 
         Lexer.Tipo op = noMaisFatores.getFilho(0).getFilho(0).getTipoToken();
@@ -205,7 +203,7 @@ public class TradutorCodigo {
             emitir("CRVL", tabelaSimbolos.obterEndereco(primeiro.getLexema())); // CRVL = Carregar Valor da variável
         } else if (primeiro.getTipoToken() == Lexer.Tipo.NUMERO_REAL) {
             emitir("CRCT", Double.parseDouble(primeiro.getLexema()));           // CRCT = Carregar Constante literal
-        } else if (primeiro.getTipoToken() == Lexer.Tipo.ABRE_PAR) {
+        } else {
             traduzirExpressao(noFator.getFilho(1));
         }
     }

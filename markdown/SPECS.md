@@ -226,7 +226,7 @@ A Máquina Hipotética é uma arquitetura de pilha com memória linear de variá
 | `DIVI` | - | Divisão: `M[s-1] = M[s-1] / M[s]; s--` |
 | `INVE` | - | Inversão de sinal do topo: `M[s] = -M[s]` |
 | `CPIG` | - | Igualdade: `M[s-1] = (M[s-1] == M[s] ? 1 : 0); s--` |
-| `CDIF` | - | Diferença: `M[s-1] = (M[s-1] != M[s] ? 1 : 0); s--` |
+| `CDES` | - | Desigualdade: `M[s-1] = (M[s-1] != M[s] ? 1 : 0); s--` |
 | `CPMA` | - | Maior: `M[s-1] = (M[s-1] > M[s] ? 1 : 0); s--` |
 | `CPME` | - | Menor: `M[s-1] = (M[s-1] < M[s] ? 1 : 0); s--` |
 | `CMAI` | - | Maior ou Igual: `M[s-1] = (M[s-1] >= M[s] ? 1 : 0); s--` |
@@ -236,10 +236,6 @@ A Máquina Hipotética é uma arquitetura de pilha com memória linear de variá
 | `LEIT` | - | Lê um valor `double` da entrada padrão e coloca no topo (`s++; M[s] = read()`) |
 | `IMPR` | - | Imprime o valor do topo da pilha na saída padrão e desempilha (`print(M[s]); s--`) |
 | `PARA` | - | Encerra a execução do programa na máquina hipotética |
-| `PUSHER`| `p`| *(Suporte a procedimentos)* Empilha endereço de retorno `p` |
-| `PARAM` | `n` | *(Suporte a procedimentos)* Empilha valor de parâmetro do endereço `n` |
-| `CHPR` | `p` | *(Suporte a procedimentos)* Chama procedimento em `p` |
-| `RTPR` | - | *(Suporte a procedimentos)* Retorna do procedimento |
 
 ### 6.2 Exemplo de Tradução de `correto.java.txt`
 

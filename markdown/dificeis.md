@@ -10,7 +10,7 @@
 | # | Ponto difícil | Arquivo principal | Ideia-chave em 1 frase |
 | :-: | :--- | :--- | :--- |
 | 1 | Duas pilhas sincronizadas no `REDUCE` | `ParserSLR.java` | Cada símbolo empilhado tem um estado embaixo; o `add(0, ...)` desinverte a ordem dos filhos. |
-| 2 | Os 5 "hubs" de padrões dos 95 estados | `TabelaSLR.java` | Estados diferentes abrem o mesmo bloco (`CMDS`, `EXPRESSAO`, `FATOR`), mudando só para onde voltam no `GOTO`. |
+| 2 | Como ler os 95 estados (`0` a `94`) em sequência | `TabelaSLR.java` | Os estados ficam em ordem numérica; blocos parecidos (`16, 73, 81, 92`) só mudam o `GOTO` de saída. |
 | 3 | Reduções vazias ($\lambda$) e o `FOLLOW` | `TabelaSLR.java` | Regra vazia dá **0 pops**, não consome token, e só dispara para os tokens de `FOLLOW(LHS)`. |
 | 4 | Recursão à direita virando conta à esquerda | `TradutorCodigo.java` | Emitir `SOMA`/`SUBT` **antes** da recursão evita que `10 - 3 - 2` vire `9`. |
 | 5 | Ordem de `if/else` e `while` (Backpatching) | `TradutorCodigo.java` | No `if/else`, o `DSVI` do fim do `if` precisa nascer **antes** de corrigir o `DSVF`. |
@@ -56,26 +56,24 @@ E por que [`novoNoPai.filhos.add(0, pilhaDeNos.pop())`](file:///c:/Users/Muril/c
 
 ---
 
-## 2. Por que os 95 estados são fatorados em 5 "hubs" em `TabelaSLR`
+## 2. Como estão organizados os 95 estados (`0` a `94`) em `TabelaSLR`
 
-**Onde está:** [`TabelaSLR`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L244-L294)
+**Onde está:** [`TabelaSLR.carregarEstadosSLR`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L243-L468)
 
 ### Por que parece confuso?
-Em [`carregarEstadosSLR`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L299-L420), seis estados completamente diferentes (`16, 26, 33, 73, 81, 92`) chamam [`configurarHubDeComandos`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L245-L259), e todos mandam seus `SHIFT`s e `GOTO`s internos para os mesmos estados `17, 18, 19, 20, 21, 22, 23, 24, 26, 27` — mudando só o parâmetro `destinoCmds`!
+Quando você olha a tabela gerada, vários estados têm transições muito parecidas — por exemplo, `16`, `73`, `81` e `92` listam praticamente os mesmos `SHIFT`s e `GOTO`s iniciais.
 
 ### O macete para entender
-Quando o parser chega em qualquer lugar que espera um bloco `<CMDS>`, o conjunto de itens que podem começar ali (`closure(CMDS)`) é **idêntico**:
-- `16`: corpo do `main { ... }` $\rightarrow$ quando terminar `CMDS`, vai pro estado `25`
-- `73`: corpo do `if (...) { ... }` $\rightarrow$ quando terminar `CMDS`, vai pro estado `82`
-- `81`: corpo do `while (...) { ... }` $\rightarrow$ quando terminar `CMDS`, vai pro estado `86`
-- `92`: corpo do `else { ... }` $\rightarrow$ quando terminar `CMDS`, vai pro estado `93`
-- `33`: continuação após `;` $\rightarrow$ quando terminar `CMDS`, vai pro estado `50`
-- `26`: continuação após um `if` ou `while` $\rightarrow$ quando terminar `CMDS`, vai pro estado `38`
+Não há nenhum truque escondido: os estados `0` a `94` ficam listados direto em ordem numérica, exatamente como saíram da tabela `SLR(1)`. Os blocos parecem repetidos só porque o início de qualquer bloco `{ ... }` aceita os mesmos comandos (`double`, `if`, `while`, `System.out.println`, `id`):
+- **Estado `16`**: bloco do `main { ... }` $\rightarrow$ quando `<CMDS>` termina, o `GOTO` manda para `25`
+- **Estado `73`**: bloco do `if (...) { ... }` $\rightarrow$ quando `<CMDS>` termina, o `GOTO` manda para `82`
+- **Estado `81`**: bloco do `while (...) { ... }` $\rightarrow$ quando `<CMDS>` termina, o `GOTO` manda para `86`
+- **Estado `92`**: bloco do `else { ... }` $\rightarrow$ quando `<CMDS>` termina, o `GOTO` manda para `93`
 
-Como todos reconhecem **as mesmas instruções iniciais** (`double`, `if`, `while`, `print`, `id`), os desvios para dentro dos comandos são compartilhados, evitando repetir 6 vezes as mesmas 12 linhas. O mesmo raciocínio vale para [`configurarInicioExpressao`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L262-L268), [`configurarInicioFator`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L271-L276), [`configurarContinuacaoSoma`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L279-L285) e [`configurarContinuacaoMult`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L288-L294).
+Cada um apenas guarda seu próprio número de continuação para saber de qual bloco está saindo quando fechar `}`.
 
-> **Fala pronta (15s):**  
-> *"Na coleção canônica LR(0), sempre que um bloco `{ CMDS }`, uma `EXPRESSAO` ou um `FATOR` abre em contextos diferentes, o fecho interno é idêntico; só muda o estado de retorno via `GOTO`. Fatoramos esses 5 padrões em métodos auxiliares para eliminar repetição sem alterar nenhum dos 95 estados."*
+> **Fala pronta (10s):**  
+> *"Os 95 estados (`0` a `94`) estão em ordem numérica direta na tabela `SLR(1)`. Quando vários estados parecem parecidos — como `16`, `73`, `81` e `92` — é só porque abrem um bloco `{ ... }` diferente com os mesmos comandos válidos, mudando apenas o `GOTO` de saída."*
 
 ---
 
@@ -88,7 +86,7 @@ Como o parser pode "reduzir do nada" sem ler nenhum token? E por que isso não b
 
 ### O macete para entender
 1. **Regra vazia dá `0` pops:** em regras como `R11 (CMDS -> λ)` ou `R18 (PFALSA -> λ)`, `regra.ladoDireito.length == 0`. O laço `for` de [`ParserSLR`](file:///c:/Users/Muril/compilador-java/src/compilador/ParserSLR.java#L125) roda **0 vezes**, **não avança** o token atual da entrada, cria um nó vazio (ex.: `PFALSA` sem filhos) e consulta `GOTO[estadoAtual, PFALSA]`.
-2. **Só reduz nos tokens do `FOLLOW`:** veja o **Estado `87`** ([linha 373](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L373)), logo após fechar `if (...) { ... }`:
+2. **Só reduz nos tokens do `FOLLOW`:** veja o **Estado `87`** ([linhas 449-450](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L449-L450)), logo após fechar `if (...) { ... }`:
    - Veio `else`? $\rightarrow$ **`SHIFT` para `90`** (tem `else`).
    - Veio `}`, `double`, `if`, `while`, `System.out.println` ou `id`? $\rightarrow$ esses são exatamente os tokens de [`FOLLOW(PFALSA)`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L225), então faz **`REDUCE R18`** (`PFALSA -> λ`).
    - Como `else` **não** está em `FOLLOW(PFALSA)`, nunca há conflito Shift/Reduce.

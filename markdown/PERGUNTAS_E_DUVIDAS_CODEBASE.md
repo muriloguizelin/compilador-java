@@ -95,9 +95,9 @@
   $$\text{proximoEstado} = \text{GOTO}(s', \text{regra.ladoEsquerdo})$$
   O novo nó pai (`novoNoPai`) e o `proximoEstado` são então empilhados.
 
-### P16. Por que nos estados Hub (como o 16) temos `adicionarReduce(estadoHub, 11)` e como o `FOLLOW` entra nisso?
-* **Onde no código:** [`TabelaSLR.java:107-113`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L107-L113) e [`linhas 245-259`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L245-L259)
-* **Razão:** Os estados Hub (`16, 26, 33, 73, 81, 92`), configurados pelo método `configurarHubDeComandos`, representam os pontos em que o parser lê um bloco de comandos `{ <CMDS> }`. A regra 11 é $\text{CMDS} \rightarrow \lambda$ (bloco vazio). O método `adicionarReduce(estadoHub, 11)` consulta `conjuntoFollow.get(CMDS)`, cujo único elemento é `FECHA_CHAVE` (`}`), e registra a redução exclusivamente para esse token. Se vier `double`, `id`, `if`, `while` ou `System.out.println`, o parser faz `SHIFT`, demonstrando a ausência de conflitos.
+### P16. Por que nos estados de bloco de comandos (como o 16) temos `adicionarReduce(16, 11)` e como o `FOLLOW` entra nisso?
+* **Onde no código:** [`TabelaSLR.java:107-113`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L107-L113) e [`linhas 276-280`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L276-L280)
+* **Razão:** Os estados `16, 26, 33, 73, 81, 92` representam os pontos em que o parser espera um bloco `<CMDS>`. A regra 11 é $\text{CMDS} \rightarrow \lambda$ (bloco vazio). O método `adicionarReduce(16, 11)` consulta `conjuntoFollow.get(CMDS)`, cujo único elemento é `FECHA_CHAVE` (`}`), e registra a redução exclusivamente para esse token. Se vier `double`, `id`, `if`, `while` ou `System.out.println`, o parser faz `SHIFT`, demonstrando a ausência de conflitos.
 
 ### P17. Por que a tabela foi pré-computada em código Java em vez de gerada em tempo de execução?
 * **Onde no código:** [`TabelaSLR.java:52-56`](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java#L52-L56)

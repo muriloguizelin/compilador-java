@@ -96,7 +96,7 @@ public class Lexer {
     private int colunaAtual = 1;
 
     public Lexer(String codigoFonte) {
-        this.codigoFonte = (codigoFonte != null) ? codigoFonte : "";
+        this.codigoFonte = codigoFonte;
     }
 
     public static Lexer fromFile(String caminhoArquivo) throws IOException {

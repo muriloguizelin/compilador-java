@@ -178,7 +178,7 @@ O analisador sintático é dividido de forma enxuta e modular em 2 arquivos no p
 - [TabelaSLR.java](file:///c:/Users/Muril/compilador-java/src/compilador/TabelaSLR.java):
   - `TabelaSLR.Regra`: Representa uma produção $A \rightarrow \beta$ com `numeroRegra`, `ladoEsquerdo` e array `ladoDireito`.
   - `TabelaSLR.Acao` e `TabelaSLR.AcaoTipo`: Representam as transições `SHIFT`, `REDUCE`, `ACCEPT` e `ERROR`.
-  - `definirGramatica()`, `carregarFirstFollow()` e `carregarEstadosSLR()`: Carregam a gramática formal e os 95 estados canônicos usando os 5 métodos de padrões (`configurarHubDeComandos`, `configurarInicioExpressao`, `configurarInicioFator`, `configurarContinuacaoSoma`, `configurarContinuacaoMult`) e aplicando `FOLLOW(ladoEsquerdo)` nas reduções via `adicionarReduce(estadoAtual, numeroDaRegra)`.
+  - `definirGramatica()`, `carregarFirstFollow()` e `carregarEstadosSLR()`: Carregam a gramática formal e os 95 estados (`0` a `94`) diretamente em ordem numérica, aplicando `FOLLOW(ladoEsquerdo)` nas reduções via `adicionarReduce(estadoAtual, numeroDaRegra)`.
 
 ---
 

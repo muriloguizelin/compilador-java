@@ -52,7 +52,6 @@ public class MaquinaHipotetica {
     // M: Memória de dados (pilha onde ficam tanto as variáveis quanto os resultados
     // das contas)
     private final double[] M = new double[10000];
-    // se chegar a 10000 vai quebrar tudo? como tratar?
 
     // i: Apontador de instrução (diz qual linha do programa será executada agora;
     // começa na linha 0)
@@ -69,6 +68,13 @@ public class MaquinaHipotetica {
         this.modoTrace = modoTrace;
     }
 
+    private void verificarLimitePilha(int posicoes) {
+        if (s + posicoes >= M.length) {
+            throw new IllegalStateException(
+                    "Estouro da pilha de memoria (limite de " + M.length + " posicoes)");
+        }
+    }
+
     public List<InstrucaoVM> getPrograma() {
         return programa;
     }
@@ -83,29 +89,11 @@ public class MaquinaHipotetica {
 
         for (String linha : linhasDoArquivo) {
             linha = linha.trim();
+            if (linha.isEmpty()) continue;
 
-            // Ignora linhas em branco ou linhas de comentário
-            if (linha.isEmpty() || linha.startsWith("#") || linha.startsWith("//")) {
-                continue;
-            }
-            // é para vir sem linha vazia ou comentada ne
-
-            // Remove comentários no final da linha (ex: "DSVI 4 # volta pro while")
-            if (linha.contains("#")) {
-                linha = linha.substring(0, linha.indexOf('#')).trim();
-            }
-            // tambem é pra vir sem comentario ne
-
-            // Remove prefixo de número de linha caso exista (ex: "0: INPP" vira "INPP")
-            if (linha.contains(":")) {
-                linha = linha.split(":", 2)[1].trim();
-            }
-            // tambem é pra vir sem isso
-
-            // Divide a linha por espaço: a 1ª parte é o nome da operação e a 2ª (se
-            // existir) é o número (argumento)
+            // Divide a linha por espaço: a 1ª parte é o nome da operação e a 2ª (se existir) é o argumento
             String[] partes = linha.split("\\s+");
-            String operacao = partes[0].toUpperCase();
+            String operacao = partes[0];
             Double argumento = (partes.length > 1) ? Double.parseDouble(partes[1]) : null;
 
             programa.add(new InstrucaoVM(operacao, argumento));
@@ -155,6 +143,7 @@ public class MaquinaHipotetica {
 
                 case "ALME": // Alocar Memória: avança 's' para reservar espaço para as variáveis declaradas
                     int qtdAlocar = instrucao.argumento.intValue();
+                    verificarLimitePilha(qtdAlocar);
                     s = s + qtdAlocar;
                     break;
 
@@ -172,12 +161,14 @@ public class MaquinaHipotetica {
                 // ==============================================================
 
                 case "CRCT": // Carregar Constante: coloca um número literal (ex: 10) no topo da pilha
+                    verificarLimitePilha(1);
                     s = s + 1;
                     M[s] = instrucao.argumento;
                     break;
 
                 case "CRVL": // Carregar Valor: busca o valor de uma variável na memória e coloca no topo da
                              // pilha
+                    verificarLimitePilha(1);
                     int enderecoOrigem = instrucao.argumento.intValue();
                     s = s + 1;
                     M[s] = M[enderecoOrigem];
@@ -232,7 +223,7 @@ public class MaquinaHipotetica {
                     s = s - 1;
                     break;
 
-                case "CDIF": // Comparar se é Diferente (!=)
+                case "CDES": // Comparar Desigualdade (!=)
                     M[s - 1] = (M[s - 1] != M[s]) ? 1.0 : 0.0;
                     s = s - 1;
                     break;
@@ -279,9 +270,10 @@ public class MaquinaHipotetica {
                 // ==============================================================
 
                 case "LEIT": // Leitura: pede um número no terminal e empilha no topo de M[]
+                    verificarLimitePilha(1);
                     System.out.print("[LEITURA] Digite um numero (double): ");
                     s = s + 1;
-                    M[s] = leitorTeclado.nextDouble();
+                    M[s] = Double.parseDouble(leitorTeclado.next().replace(',', '.'));
                     break;
 
                 case "IMPR": // Impressão: retira o valor do topo da pilha e mostra na tela
@@ -292,29 +284,6 @@ public class MaquinaHipotetica {
                     } else {
                         System.out.println(valorParaImprimir);
                     }
-                    break;
-
-                // ==============================================================
-                // 7. SUPORTE A PROCEDIMENTOS (CHAMADAS DE FUNÇÃO)
-                // ==============================================================
-
-                case "PUSHER": // Empilha o endereço de retorno antes de chamar um procedimento
-                    s = s + 1;
-                    M[s] = instrucao.argumento;
-                    break;
-
-                case "PARAM": // Copia um parâmetro da memória para o topo da pilha
-                    s = s + 1;
-                    M[s] = M[instrucao.argumento.intValue()];
-                    break;
-
-                case "CHPR": // Chama o procedimento desviando para a linha indicada
-                    i = instrucao.argumento.intValue();
-                    break;
-
-                case "RTPR": // Retorna do procedimento voltando para a linha que estava salva no topo
-                    i = (int) M[s];
-                    s = s - 1;
                     break;
 
                 default:

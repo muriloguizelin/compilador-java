@@ -77,7 +77,7 @@ Arquivo: `lalg-java.txt`
 ```
 - **Linha 16 e 17:** Uma condição sempre compara duas expressões aritméticas através de um operador relacional. Cada operador gera sua respectiva instrução na Máquina Hipotética:
   - `==` $\rightarrow$ `CPIG`
-  - `!=` $\rightarrow$ `CDIF`
+  - `!=` $\rightarrow$ `CDES`
   - `>=` $\rightarrow$ `CMAI`
   - `<=` $\rightarrow$ `CPMI`
   - `>`  $\rightarrow$ `CPMA`

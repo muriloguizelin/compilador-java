@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flashcards — Compilador SLR(1) & MaqHipo</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 sm:p-6">
+  <div class="max-w-4xl mx-auto space-y-5">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h1 class="text-xl font-bold text-[var(--foreground)]">Flashcards de Estudo — Compilador &amp; MaqHipo</h1>
+        <p class="text-sm text-[var(--muted-foreground)]">Clique no card (ou aperte <kbd class="px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--card)] text-xs">Espaço</kbd>) para revelar a resposta. Use <kbd class="px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--card)] text-xs">←</kbd> <kbd class="px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--card)] text-xs">→</kbd> para navegar.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnShuffle" class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-xs font-medium transition">
+          Embaralhar
+        </button>
+        <button id="btnResetMastered" class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-xs font-medium transition">
+          Resetar progresso
+        </button>
+      </div>
+    </div>
+
+    <!-- Category Tabs -->
+    <div id="tabs" class="flex flex-wrap gap-2"></div>
+
+    <!-- Progress Bar -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div class="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
+        <span id="counterText" class="font-semibold text-[var(--foreground)]">Card 1 de 1</span>
+        <span>•</span>
+        <span id="masteredText">0 dominados nesta seção</span>
+      </div>
+      <div class="w-full sm:w-56 h-2 rounded-full bg-[var(--secondary)] overflow-hidden">
+        <div id="progressBar" class="h-full bg-[var(--primary)] transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Flashcard -->
+    <div id="cardContainer" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-sm cursor-pointer transition hover:border-[var(--primary)] select-none" role="button" tabindex="0" aria-label="Flashcard interativo">
+      <div class="flex items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="cardCategoryBadge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--secondary)] text-[var(--secondary-foreground)]"></span>
+          <span id="cardFile" class="text-xs font-mono text-[var(--muted-foreground)]"></span>
+        </div>
+        <span id="cardStatePill" class="px-2.5 py-1 rounded-full text-xs font-medium border border-[var(--border)] text-[var(--muted-foreground)]">
+          Pergunta
+        </span>
+      </div>
+
+      <!-- Code Block -->
+      <pre id="cardCode" class="bg-[var(--background)] border border-[var(--border)] rounded-xl p-4 text-xs font-mono overflow-x-auto leading-relaxed text-[var(--foreground)] mb-4 select-text"></pre>
+
+      <!-- Question -->
+      <div class="space-y-2">
+        <p class="text-xs uppercase tracking-wider font-semibold text-[var(--muted-foreground)]">Pergunta</p>
+        <h2 id="cardQuestion" class="text-base sm:text-lg font-semibold text-[var(--foreground)] leading-snug"></h2>
+      </div>
+
+      <!-- Answer (Hidden until clicked) -->
+      <div id="answerSection" class="hidden mt-5 pt-5 border-t border-[var(--border)] space-y-2">
+        <p class="text-xs uppercase tracking-wider font-semibold text-[var(--primary)]">Resposta</p>
+        <div id="cardAnswer" class="text-sm text-[var(--foreground)] leading-relaxed space-y-2"></div>
+      </div>
+
+      <!-- Click Hint -->
+      <div id="clickHint" class="mt-5 pt-3 border-t border-dashed border-[var(--border)] text-center text-xs text-[var(--muted-foreground)]">
+        Clique no card ou pressione Espaço para ver a resposta
+      </div>
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <button id="btnPrev" class="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-sm font-medium transition">
+        ← Anterior
+      </button>
+
+      <div class="flex items-center gap-2">
+        <button id="btnToggleAnswer" class="px-4 py-2 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-semibold hover:opacity-90 transition">
+          Mostrar Resposta
+        </button>
+        <button id="btnMastered" class="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-sm font-medium transition">
+          Marcar como Dominado
+        </button>
+      </div>
+
+      <button id="btnNext" class="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-sm font-medium transition">
+        Próximo →
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    const CATEGORIES = [
+      { id: "all",       label: "Todas" },
+      { id: "lexico",    label: "1. Léxico" },
+      { id: "sintatico", label: "2. Sintático" },
+      { id: "semantico", label: "3. Semântico" },
+      { id: "maqhipo",   label: "4. MaqHipo" },
+      { id: "gramatica", label: "5. Gramática & Estados" }
+    ];
+
+    const CARDS = [
+      // ===================== 1. LÉXICO =====================
+      {
+        id: "lex-1",
+        cat: "lexico",
+        catName: "1. Analisador Léxico",
+        file: "Lexer.java",
+        code: `if ("System".equals(palavra) && codigoFonte.startsWith(".out.println", posicaoAtual)) {
+    for (int i = 0; i < ".out.println".length(); i++) lerProximoCaractere();
+    return new Token(Tipo.PRINT, "System.out.println", linhaToken, colunaToken);
+}
+if ("lerDouble".equals(palavra) && codigoFonte.startsWith("()", posicaoAtual)) {
+    lerProximoCaractere();
+    lerProximoCaractere();
+    return new Token(Tipo.LER_DOUBLE, "lerDouble()", linhaToken, colunaToken);
+}`,
+        question: "Por que 'System.out.println' e 'lerDouble()' são reconhecidos como um único Token cada, em vez de quebrar nos pontos e parênteses?",
+        answer: "Porque a gramática lalg-java não possui classes, objetos, nem o operador ponto ('.'). Para a gramática, 'System.out.println' é um único terminal (PRINT) e 'lerDouble()' é um único terminal (LER_DOUBLE). Espiar à frente com startsWith() mantém o Léxico simples e fiel à gramática."
+      },
+      {
+        id: "lex-2",
+        cat: "lexico",
+        catName: "1. Analisador Léxico",
+        file: "Lexer.java",
+        code: `case '=': return consumirSeProximoFor('=')
+        ? new Token(Tipo.EQ, "==", linhaToken, colunaToken)
+        : new Token(Tipo.ATRIB, "=", linhaToken, colunaToken);
+case '!':
+    if (consumirSeProximoFor('=')) return new Token(Tipo.NE, "!=", linhaToken, colunaToken);
+    throw new LexicalException("Esperado '=' apos '!'", linhaToken, colunaToken);`,
+        question: "Como o Lexer diferencia '=' de '==' e por que '!' sozinho lança LexicalException?",
+        answer: "Ele usa lookahead de 1 caractere com consumirSeProximoFor('='): se o próximo caractere também for '=', consome os dois e gera EQ ('=='); caso contrário, gera ATRIB ('='). Já '!' sozinho não existe na linguagem (não há operador lógico NOT), então dispara LexicalException."
+      },
+      {
+        id: "lex-3",
+        cat: "lexico",
+        catName: "1. Analisador Léxico",
+        file: "Lexer.java",
+        code: `if (posicaoAtual + 1 < codigoFonte.length() &&
+    codigoFonte.charAt(posicaoAtual) == '.' &&
+    Character.isDigit(codigoFonte.charAt(posicaoAtual + 1))) {
+    lerProximoCaractere(); // Consome '.'
+    while (posicaoAtual < codigoFonte.length() && Character.isDigit(codigoFonte.charAt(posicaoAtual))) {
+        lerProximoCaractere();
+    }
+}`,
+        question: "Por que esse 'if' verifica 'posicaoAtual + 1 < length' e 'isDigit(charAt(posicaoAtual + 1))' antes de consumir o ponto '.'?",
+        answer: "Para garantir que só exista parte decimal se houver pelo menos um dígito após o ponto (padrão [0-9]+(\\.[0-9]+)?). Assim, algo como '10.' não é aceito como número válido: o '.' sobra e causa erro léxico."
+      },
+      {
+        id: "lex-4",
+        cat: "lexico",
+        catName: "1. Analisador Léxico",
+        file: "Lexer.java",
+        code: `private char lerProximoCaractere() {
+    char c = codigoFonte.charAt(posicaoAtual++);
+    if (c == '\\n') { linhaAtual++; colunaAtual = 1; } else { colunaAtual++; }
+    return c;
+}
+// Em pularEspacosEComentarios():
+if (!codigoFonte.startsWith("*/", posicaoAtual)) {
+    throw new LexicalException("Comentario de bloco nao fechado", linhaIni, colIni);
+}`,
+        question: "Como o Lexer mantém linha e coluna precisas mesmo pulando espaços e comentários?",
+        answer: "Toda leitura de caractere — inclusive dentro de pularEspacosEComentarios() — passa por lerProximoCaractere(), que zera a coluna e soma 1 na linha a cada '\\n'. Além disso, comentários '/*' guardam linhaIni e colIni para apontar onde o comentário começou caso chegue ao fim do arquivo sem '*/'."
+      },
+
+      // ===================== 2. SINTÁTICO =====================
+      {
+        id: "sin-1",
+        cat: "sintatico",
+        catName: "2. Analisador Sintático SLR(1)",
+        file: "ParserSLR.java",
+        code: `Deque<Integer> pilhaDeEstados = new ArrayDeque<>();
+Deque<NoSintatico> pilhaDeNos = new ArrayDeque<>();
+pilhaDeEstados.push(0); // Começa no Estado 0`,
+        question: "Por que 'pilhaDeEstados' começa com [0] e 'pilhaDeNos' começa vazia?",
+        answer: "Porque a pilha de estados tem sempre 1 elemento a mais que a pilha de nós: o 0 na base é o estado inicial do autômato antes de ler qualquer símbolo. A cada SHIFT, empilhamos 1 nó e 1 estado juntos; a cada REDUCE de tamanho k, desempilhamos k de cada pilha, expondo o estado anterior na base."
+      },
+      {
+        id: "sin-2",
+        cat: "sintatico",
+        catName: "2. Analisador Sintático SLR(1)",
+        file: "ParserSLR.java",
+        code: `case REDUCE:
+    totalReduces++;
+    TabelaSLR.Regra regra = acao.regraParaReduzir;
+    NoSintatico novoNoPai = new NoSintatico(regra.ladoEsquerdo);
+    for (int k = 0; k < regra.ladoDireito.length; k++) {
+        pilhaDeEstados.pop();
+        novoNoPai.filhos.add(0, pilhaDeNos.pop());
+    }
+    int proximoEstado = tabela.obterGoto(pilhaDeEstados.peek(), regra.ladoEsquerdo);
+    pilhaDeNos.push(novoNoPai);
+    pilhaDeEstados.push(proximoEstado);`,
+        question: "Por que usamos 'add(0, pilhaDeNos.pop())' no REDUCE e por que o GOTO consulta 'pilhaDeEstados.peek()' depois do loop?",
+        answer: "1) A pilha sai na ordem inversa (LIFO, da direita para a esquerda), então inserir sempre no índice 0 restaura os filhos na ordem esquerda → direita da regra. 2) Depois de dar k pops, o topo de pilhaDeEstados é justamente o estado que estava ativo antes de começar a ler aquela regra — é dele que consultamos GOTO[estado, ladoEsquerdo]."
+      },
+      {
+        id: "sin-3",
+        cat: "sintatico",
+        catName: "2. Analisador Sintático SLR(1)",
+        file: "ParserSLR.java / TabelaSLR.java",
+        code: `/* R11 */ adicionarRegra(CMDS); // vazio (ladoDireito.length == 0)
+/* R18 */ adicionarRegra(PFALSA); // vazio`,
+        question: "O que acontece no parser quando ele aplica REDUCE em uma regra vazia (λ)? O token atual da entrada é consumido?",
+        answer: "Não consome o token da entrada! Como ladoDireito.length == 0, o laço for roda 0 vezes (0 pops nas pilhas). O parser apenas cria um nó vazio (ex: PFALSA sem filhos), consulta GOTO[topo, PFALSA], empilha o nó e o novo estado, e continua analisando o mesmo token."
+      },
+      {
+        id: "sin-4",
+        cat: "sintatico",
+        catName: "2. Analisador Sintático SLR(1)",
+        file: "TabelaSLR.java",
+        code: `private void adicionarReduce(int estadoAtual, int numeroDaRegra) {
+    Regra regra = regrasDaGramatica.get(numeroDaRegra);
+    for (Lexer.Tipo tokenDoFollow : conjuntoFollow.get(regra.ladoEsquerdo)) {
+        tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())
+                    .put(tokenDoFollow, new Acao(AcaoTipo.REDUCE, 0, regra));
+    }
+}`,
+        question: "O que esse laço 'for' representa na teoria de compiladores e por que ele diferencia o SLR(1) do LR(0)?",
+        answer: "No LR(0), uma redução é colocada em TODOS os terminais, gerando conflitos Shift/Reduce em regras vazias e listas. No SLR(1), usamos 1 token de lookahead restringindo o REDUCE apenas aos tokens que pertencem a FOLLOW(ladoEsquerdo), eliminando todos os conflitos desta gramática."
+      },
+
+      // ===================== 3. SEMÂNTICO =====================
+      {
+        id: "sem-1",
+        cat: "semantico",
+        catName: "3. Analisador Semântico",
+        file: "AnalisadorSemantico.java",
+        code: `public TabelaSimbolos analisar(ParserSLR.NoSintatico noRaizProg) {
+    // O filho 15 de PROG é o bloco <CMDS> dentro do método main
+    percorrerComandos(noRaizProg.getFilho(15));
+    return tabela;
+}`,
+        question: "Por que o Analisador Semântico começa exatamente em 'getFilho(15)'?",
+        answer: "Porque o ParserSLR monta uma Árvore Sintática Concreta (CST), mantendo todos os tokens da regra R1: public(0) class(1) id(2) {(3) public(4) static(5) void(6) main(7) ((8) String(9) [(10) ](11) id(12) )(13) {(14) CMDS(15). Assim, pulamos o nome da classe e o 'args' e entramos direto no bloco de comandos."
+      },
+      {
+        id: "sem-2",
+        cat: "semantico",
+        catName: "3. Analisador Semântico",
+        file: "AnalisadorSemantico.java",
+        code: `private final Map<String, Simbolo> variaveisDeclaradas = new LinkedHashMap<>();
+
+Simbolo novo = new Simbolo(nome, "double", variaveisDeclaradas.size(),
+                           tokenVariavel.linha, tokenVariavel.coluna);
+variaveisDeclaradas.put(nome, novo);`,
+        question: "Por que usamos 'LinkedHashMap' em vez de 'HashMap' e como é definido o endereço de memória de cada variável?",
+        answer: "O LinkedHashMap preserva a ordem exata em que as variáveis foram declaradas (o HashMap comum embaralha). Usando variaveisDeclaradas.size() antes do put(), a 1ª variável recebe endereço 0, a 2ª recebe 1, a 3ª recebe 2, batendo direto com os índices de M[] na MaqHipo."
+      },
+      {
+        id: "sem-3",
+        cat: "semantico",
+        catName: "3. Analisador Semântico",
+        file: "AnalisadorSemantico.java",
+        code: `private void percorrerComandos(ParserSLR.NoSintatico no) {
+    if (no == null) return;
+    if (no.naoTerminal == ParserSLR.NaoTerminal.VAR) {
+        cadastrarVariaveis(no);
+        return;
+    }
+    if (no.getTipoToken() == Lexer.Tipo.ID) {
+        tabela.verificarDeclarada(no.token);
+        return;
+    }
+    for (ParserSLR.NoSintatico filho : no.filhos) percorrerComandos(filho);
+}`,
+        question: "Por que o percurso é em pré-ordem e por que há um 'return;' logo após 'cadastrarVariaveis(no)'?",
+        answer: "1) Em pré-ordem (topo → baixo, esquerda → direita), visitamos os comandos na ordem cronológica do código, detectando uso de variável antes da declaração. 2) Como cadastrarVariaveis(no) já percorre toda a subárvore do nó VAR inserindo os IDs, o 'return;' evita descer de novo neles como se fossem uso."
+      },
+      {
+        id: "sem-4",
+        cat: "semantico",
+        catName: "3. Analisador Semântico",
+        file: "AnalisadorSemantico.java / TradutorCodigo.java",
+        code: `// No exemplo correto.java.txt:
+// double cont; double a, b, c;
+// -> totalVars = 4 -> Tradutor emite: ALME 4`,
+        question: "A gramática permite declarar 'double x;' no meio de comandos ou dentro de um 'if'. Como o Semântico e a MaqHipo tratam o escopo?",
+        answer: "O escopo é único (plano) para todo o método main: não pode redeclarar o mesmo nome em outro lugar do main (unicidade), e o endereço é alocado uma única vez no início do programa com 'ALME totalVars' e liberado ao final com 'DESM totalVars'."
+      },
+
+      // ===================== 4. MAQHIPO & TRADUTOR =====================
+      {
+        id: "maq-1",
+        cat: "maqhipo",
+        catName: "4. MaqHipo & Tradutor",
+        file: "MaquinaHipotetica.java",
+        code: `private final double[] M = new double[10000];
+private int i = 0;  // Program Counter
+private int s = -1; // Topo da pilha M[]`,
+        question: "Por que o registrador 's' começa em -1 (e não em 0) e o que fica guardado no vetor M[]?",
+        answer: "M[] é 0-indexado: s = -1 indica pilha vazia. Ao executar 'ALME 4', s passa para 3, reservando M[0..3] para as 4 variáveis. Acima de M[3] (M[4], M[5]...), o mesmo vetor M[] funciona como pilha de operandos para cálculos e desvios."
+      },
+      {
+        id: "maq-2",
+        cat: "maqhipo",
+        catName: "4. MaqHipo & Tradutor",
+        file: "MaquinaHipotetica.java",
+        code: `case "SUBT":
+    M[s - 1] = M[s - 1] - M[s];
+    s = s - 1;
+    break;
+case "DIVI":
+    if (M[s] == 0.0) throw new ArithmeticException("... Divisao por zero na linha " + linhaExecutada);
+    M[s - 1] = M[s - 1] / M[s];
+    s = s - 1;
+    break;`,
+        question: "Por que fazemos 'M[s - 1] - M[s]' (e não 'M[s] - M[s - 1]') e testamos 'M[s] == 0.0' no DIVI?",
+        answer: "Em 'a - b' ou 'a / b', o operando esquerdo ('a') é empilhado primeiro e fica em M[s - 1]; o operando direito ('b') é empilhado por último e fica no topo M[s]. Logo, 'b' é o subtraendo/divisor, por isso testamos M[s] == 0.0 antes de dividir."
+      },
+      {
+        id: "maq-3",
+        cat: "maqhipo",
+        catName: "4. MaqHipo & Tradutor",
+        file: "TradutorCodigo.java",
+        code: `traduzirCondicao(noCondicao);
+int linhaDsvf = emitir("DSVF", -1);
+traduzirBlocoComandos(noCorpoPrincipal);
+
+if (noElse.getQtdFilhos() >= 4) {
+    int linhaDsvi = emitir("DSVI", -1);
+    corrigirDesvio(linhaDsvf, listaInstrucoes.size());
+    traduzirBlocoComandos(noElse.getFilho(2));
+    corrigirDesvio(linhaDsvi, listaInstrucoes.size());
+} else {
+    corrigirDesvio(linhaDsvf, listaInstrucoes.size());
+}`,
+        question: "O que é Backpatching e por que 'emitir(\"DSVI\", -1)' precisa vir ANTES de 'corrigirDesvio(linhaDsvf, ...)'?",
+        answer: "Backpatching é emitir o salto com endereço provisório (-1) porque o tamanho do bloco ainda é desconhecido, e preencher o destino real quando o bloco termina. No if/else, o DSVI do fim do 'if' (que pula o 'else') precisa ser emitido antes de corrigir o DSVF; senão, quando a condição fosse falsa, o DSVF pularia em cima do DSVI e pularia o próprio 'else'!"
+      },
+      {
+        id: "maq-4",
+        cat: "maqhipo",
+        catName: "4. MaqHipo & Tradutor",
+        file: "TradutorCodigo.java",
+        code: `private void traduzirOutrosTermos(ParserSLR.NoSintatico noOutros) {
+    if (noOutros == null || noOutros.getQtdFilhos() == 0) return;
+    traduzirTermo(noOutros.getFilho(1));
+    Lexer.Tipo op = noOutros.getFilho(0).getFilho(0).getTipoToken();
+    emitir(op == Lexer.Tipo.MAIS ? "SOMA" : "SUBT");
+    traduzirOutrosTermos(noOutros.getFilho(2));
+}`,
+        question: "A gramática é recursiva à direita. Como esse método garante que '10 - 3 - 2' dê 5 e não 9?",
+        answer: "Porque o 'emitir(SUBT)' acontece ANTES da chamada recursiva traduzirOutrosTermos(noOutros.getFilho(2)). Assim, a VM empilha 10, empilha 3, já executa SUBT (deixando 7 no topo), depois empilha 2 e executa SUBT (resultando em 5), preservando a associatividade à esquerda."
+      },
+      {
+        id: "maq-5",
+        cat: "maqhipo",
+        catName: "4. MaqHipo & Tradutor",
+        file: "MaquinaHipotetica.java",
+        code: `case "LEIT":
+    verificarLimitePilha(1);
+    System.out.print("[LEITURA] Digite um numero (double): ");
+    s = s + 1;
+    M[s] = Double.parseDouble(leitorTeclado.next().replace(',', '.'));
+    break;`,
+        question: "Por que usamos 'next().replace(',', '.')' no LEIT e como funciona 'verificarLimitePilha'?",
+        answer: "1) Em sistemas pt-BR, Scanner.nextDouble() rejeita ponto ('5.5') e quebra; trocando ',' por '.' antes de Double.parseDouble, aceita tanto '5.5' quanto '5,5'. 2) verificarLimitePilha(n) checa se 's + n >= M.length' antes de avançar 's', evitando ArrayIndexOutOfBoundsException caso a pilha estoure os 10.000 espaços."
+      },
+      {
+        id: "maq-6",
+        cat: "maqhipo",
+        catName: "4. MaqHipo & Tradutor",
+        file: "MaquinaHipotetica.java / TradutorCodigo.java",
+        code: `// No TradutorCodigo.java:
+case NE: emitir("CDES"); break;
+
+// Na MaquinaHipotetica.java:
+case "CDES":
+    M[s - 1] = (M[s - 1] != M[s]) ? 1.0 : 0.0;
+    s = s - 1;
+    break;`,
+        question: "O que significa a instrução 'CDES' e qual valor ela deixa no topo da pilha?",
+        answer: "CDES significa 'Comparar Desigualdade' (!=), seguindo o mnemônico oficial dos slides da MaqHipo. Ela compara M[s - 1] != M[s], grava 1.0 (verdadeiro) ou 0.0 (falso) em M[s - 1] e decrementa s."
+      },
+
+      // ===================== 5. GRAMÁTICA & ESTADOS =====================
+      {
+        id: "gra-1",
+        cat: "gramatica",
+        catName: "5. Gramática & Estados",
+        file: "lalg-java.txt",
+        code: `CMDS      -> <CMD><MAIS_CMDS> | <CMD_COND><CMDS> | <DC> | λ
+MAIS_CMDS -> ;<CMDS>
+DC        -> <VAR> <MAIS_CMDS>`,
+        question: "Como a gramática exige ';' no fim de atribuições e declarações, mas proíbe ';' após fechar '}' de um 'if' ou 'while'?",
+        answer: "Comandos simples (<CMD>) e declarações (<DC>) usam <MAIS_CMDS>, que obriga começar com ';'. Já <CMD_COND> (if/while) é seguido diretamente por <CMDS> na regra R9, sem passar por <MAIS_CMDS>."
+      },
+      {
+        id: "gra-2",
+        cat: "gramatica",
+        catName: "5. Gramática & Estados",
+        file: "lalg-java.txt / TabelaSLR.java",
+        code: `// Estado 87 (logo após fechar '}' do if):
+adicionarShift(87, ELSE, 90);
+adicionarReduce(87, 18); // R18: PFALSA -> λ
+adicionarGoto(87, PFALSA, 91);`,
+        question: "Por que essa gramática NÃO tem o conflito clássico de 'Dangling Else'?",
+        answer: "Porque as chaves '{ <CMDS> }' são obrigatórias tanto no 'if' quanto no 'else'. No Estado 87 (após fechar '}' do if), se vier 'else' ele faz SHIFT para 90; se vier qualquer token de FOLLOW(PFALSA) ('}', 'if', 'while', 'double', 'id', 'System.out.println'), ele faz REDUCE R18 (PFALSA -> λ). Como 'else' não está em FOLLOW(PFALSA), há 0 conflitos."
+      },
+      {
+        id: "gra-3",
+        cat: "gramatica",
+        catName: "5. Gramática & Estados",
+        file: "lalg-java.txt",
+        code: `RESTO_IDENT -> = <EXP_IDENT>
+EXP_IDENT   -> <EXPRESSAO> | lerDouble()
+FATOR       -> id | numero_real | (<EXPRESSAO>)`,
+        question: "Por que 'lerDouble()' fica na regra EXP_IDENT e NÃO dentro de FATOR?",
+        answer: "Para impedir que a leitura do teclado apareça no meio de contas matemáticas (ex: 'c = lerDouble() + 10;' dá erro sintático). Estando apenas em EXP_IDENT, lerDouble() só pode aparecer isolado à direita de uma atribuição ('a = lerDouble();')."
+      },
+      {
+        id: "gra-4",
+        cat: "gramatica",
+        catName: "5. Gramática & Estados",
+        file: "TabelaSLR.java",
+        code: `// Estado 16 (main)      -> GOTO(16, CMDS) = 25
+// Estado 26 (pós-if)    -> GOTO(26, CMDS) = 38
+// Estado 33 (pós ';')   -> GOTO(33, CMDS) = 50
+// Estado 73 (corpo if)  -> GOTO(73, CMDS) = 82
+// Estado 81 (corpo whl) -> GOTO(81, CMDS) = 86
+// Estado 92 (corpo els) -> GOTO(92, CMDS) = 93`,
+        question: "Por que existem 6 estados quase idênticos (16, 26, 33, 73, 81, 92) que aceitam os mesmos comandos?",
+        answer: "Porque todos iniciam um bloco <CMDS>, então têm os mesmos SHIFTs ('double', 'if', 'while', 'System.out.println', 'id') e REDUCE R11 (CMDS -> λ). O que muda entre eles é o GOTO de saída: cada estado sabe para qual regra precisa voltar ao fechar o bloco (main, if, while, else, pós-';' ou pós-bloco)."
+      },
+      {
+        id: "gra-5",
+        cat: "gramatica",
+        catName: "5. Gramática & Estados",
+        file: "TabelaSLR.java",
+        code: `/* R0 */ adicionarRegra(START, PROG);
+// Estado 0:
+adicionarShift(0, PUBLIC, 1); adicionarGoto(0, PROG, 2);
+// Estado 2:
+adicionarAccept(2, EOF);`,
+        question: "Por que a gramática tem a regra extra 'START -> PROG' (R0) e o que faz o Estado 2?",
+        answer: "É a Gramática Aumentada. Criar um axioma extra START -> PROG dá ao parser um critério exato de aceitação: depois que todo o programa é reduzido para PROG no Estado 0, o GOTO leva ao Estado 2, onde encontrar o fim de arquivo ('$') dispara ACCEPT."
+      },
+      {
+        id: "gra-6",
+        cat: "gramatica",
+        catName: "5. Gramática & Estados",
+        file: "lalg-java.txt / TabelaSLR.java",
+        code: `// Métricas formais da gramática lalg-java:
+// 24 não-terminais (23 + START) | 44 regras (R0..R43)
+// 95 estados canônicos LR(0) (Estados 0 a 94)
+// Conflitos Shift/Reduce: 0 | Reduce/Reduce: 0`,
+        question: "Por que os 95 estados foram pré-definidos na TabelaSLR.java em vez de gerados em tempo de execução?",
+        answer: "Como a gramática do trabalho (lalg-java.txt) é fixa, pré-definir as tabelas ACTION e GOTO em ordem numérica (0 a 94) deixa o código mais simples de ler, garante inicialização instantânea (0 ms) e evita bugs em algoritmos dinâmicos de fecho LR(0) em tempo de execução."
+      }
+    ];
+
+    let activeCat = "all";
+    let filteredCards = [...CARDS];
+    let currentIndex = 0;
+    let isAnswerVisible = false;
+    const masteredIds = new Set();
+
+    const tabsEl = document.getElementById("tabs");
+    const cardContainer = document.getElementById("cardContainer");
+    const cardCategoryBadge = document.getElementById("cardCategoryBadge");
+    const cardFile = document.getElementById("cardFile");
+    const cardStatePill = document.getElementById("cardStatePill");
+    const cardCode = document.getElementById("cardCode");
+    const cardQuestion = document.getElementById("cardQuestion");
+    const answerSection = document.getElementById("answerSection");
+    const cardAnswer = document.getElementById("cardAnswer");
+    const clickHint = document.getElementById("clickHint");
+    const counterText = document.getElementById("counterText");
+    const masteredText = document.getElementById("masteredText");
+    const progressBar = document.getElementById("progressBar");
+    const btnPrev = document.getElementById("btnPrev");
+    const btnNext = document.getElementById("btnNext");
+    const btnToggleAnswer = document.getElementById("btnToggleAnswer");
+    const btnMastered = document.getElementById("btnMastered");
+    const btnShuffle = document.getElementById("btnShuffle");
+    const btnResetMastered = document.getElementById("btnResetMastered");
+
+    function renderTabs() {
+      tabsEl.innerHTML = "";
+      CATEGORIES.forEach(cat => {
+        const count = cat.id === "all"
+          ? CARDS.length
+          : CARDS.filter(c => c.cat === cat.id).length;
+        const active = cat.id === activeCat;
+        const btn = document.createElement("button");
+        btn.className = active
+          ? "px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] transition"
+          : "px-3 py-1.5 rounded-xl text-xs font-medium bg-[var(--card)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--secondary)] transition";
+        btn.textContent = `${cat.label} (${count})`;
+        btn.addEventListener("click", () => selectCategory(cat.id));
+        tabsEl.appendChild(btn);
+      });
+    }
+
+    function selectCategory(catId) {
+      activeCat = catId;
+      filteredCards = catId === "all"
+        ? [...CARDS]
+        : CARDS.filter(c => c.cat === catId);
+      currentIndex = 0;
+      isAnswerVisible = false;
+      renderTabs();
+      renderCard();
+    }
+
+    function renderCard() {
+      const card = filteredCards[currentIndex];
+      if (!card) return;
+
+      cardCategoryBadge.textContent = card.catName;
+      cardFile.textContent = card.file;
+      cardCode.textContent = card.code;
+      cardQuestion.textContent = card.question;
+      cardAnswer.textContent = card.answer;
+
+      // Answer visibility
+      if (isAnswerVisible) {
+        answerSection.classList.remove("hidden");
+        clickHint.classList.add("hidden");
+        cardStatePill.textContent = "Resposta";
+        btnToggleAnswer.textContent = "Ocultar Resposta";
+      } else {
+        answerSection.classList.add("hidden");
+        clickHint.classList.remove("hidden");
+        cardStatePill.textContent = "Pergunta";
+        btnToggleAnswer.textContent = "Mostrar Resposta";
+      }
+
+      // Mastered state
+      const isMastered = masteredIds.has(card.id);
+      btnMastered.textContent = isMastered ? "✓ Dominado" : "Marcar como Dominado";
+      btnMastered.className = isMastered
+        ? "px-4 py-2 rounded-xl bg-[var(--secondary)] text-[var(--secondary-foreground)] border border-[var(--primary)] text-sm font-semibold transition"
+        : "px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-sm font-medium transition";
+
+      // Progress
+      const masteredInView = filteredCards.filter(c => masteredIds.has(c.id)).length;
+      counterText.textContent = `Card ${currentIndex + 1} de ${filteredCards.length}`;
+      masteredText.textContent = `${masteredInView} de ${filteredCards.length} dominados`;
+      const pct = Math.round((masteredInView / filteredCards.length) * 100);
+      progressBar.style.width = `${pct}%`;
+
+      btnPrev.disabled = currentIndex === 0;
+      btnPrev.style.opacity = currentIndex === 0 ? "0.45" : "1";
+      btnNext.disabled = currentIndex === filteredCards.length - 1;
+      btnNext.style.opacity = currentIndex === filteredCards.length - 1 ? "0.45" : "1";
+    }
+
+    function toggleAnswer() {
+      isAnswerVisible = !isAnswerVisible;
+      renderCard();
+    }
+
+    function goPrev() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        isAnswerVisible = false;
+        renderCard();
+      }
+    }
+
+    function goNext() {
+      if (currentIndex < filteredCards.length - 1) {
+        currentIndex++;
+        isAnswerVisible = false;
+        renderCard();
+      }
+    }
+
+    cardContainer.addEventListener("click", (e) => {
+      // Avoid toggling if user is selecting code text
+      if (window.getSelection && window.getSelection().toString().length > 0) return;
+      toggleAnswer();
+    });
+
+    btnToggleAnswer.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleAnswer();
+    });
+
+    btnPrev.addEventListener("click", goPrev);
+    btnNext.addEventListener("click", goNext);
+
+    btnMastered.addEventListener("click", () => {
+      const card = filteredCards[currentIndex];
+      if (!card) return;
+      if (masteredIds.has(card.id)) masteredIds.delete(card.id);
+      else masteredIds.add(card.id);
+      renderCard();
+    });
+
+    btnShuffle.addEventListener("click", () => {
+      for (let i = filteredCards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [filteredCards[i], filteredCards[j]] = [filteredCards[j], filteredCards[i]];
+      }
+      currentIndex = 0;
+      isAnswerVisible = false;
+      renderCard();
+    });
+
+    btnResetMastered.addEventListener("click", () => {
+      masteredIds.clear();
+      renderCard();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        toggleAnswer();
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      }
+    });
+
+    renderTabs();
+    renderCard();
+  </script>
+</body>
+</html>

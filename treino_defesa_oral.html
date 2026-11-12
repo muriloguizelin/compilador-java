@@ -860,7 +860,7 @@
         keywords: ["M[s - 1]", "M[s]", "divisor", "1.0 e 0.0", "desempilha"],
         shortAnswer: "Em uma expressão binária como 'a - b' ou 'a / b', o 1º operando ('a') é empilhado primeiro e fica na sub-base 'M[s - 1]', enquanto o 2º operando ('b') é empilhado depois e fica no topo 'M[s]'. Por isso fazemos 'M[s - 1] - M[s]' e testamos divisor zero em 'M[s] == 0.0'. Já o 'DSVF' sempre faz 's--' para consumir e retirar da pilha o valor booleano (1.0 ou 0.0) deixado pela comparação relacional.",
         details: [
-          ["Como os booleanos são representados na Máquina Hipotética?", "Como 1.0 para Verdadeiro e 0.0 para Falso nas instruções CPIG, CDIF, CPMA, CPME, CMAI e CPMI."]
+          ["Como os booleanos são representados na Máquina Hipotética?", "Como 1.0 para Verdadeiro e 0.0 para Falso nas instruções CPIG, CDES, CPMA, CPME, CMAI e CPMI."]
         ]
       },
       {
@@ -1107,7 +1107,7 @@
           "D) Para incrementar o topo da pilha de dados."
         ],
         correct: 1,
-        explanation: "Isso mesmo! O PC 'i' avança automaticamente para a próxima instrução, exceto quando uma instrução de desvio (DSVI, DSVF, CHPR, RTPR) atribui um novo endereço a 'i'."
+        explanation: "Isso mesmo! O PC 'i' avança automaticamente para a próxima instrução, exceto quando uma instrução de desvio (DSVI ou DSVF) atribui um novo endereço a 'i'."
       },
       {
         topic: "MaquinaHipotetica.java • Ordem dos Operandos",

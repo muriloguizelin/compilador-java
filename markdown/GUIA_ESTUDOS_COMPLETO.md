@@ -261,7 +261,7 @@ A Máquina Hipotética simula uma CPU baseada em pilha:
 | `DIVI` | Divide penúltimo pelo topo: `M[s-1] = M[s-1] / M[s]; s--;` |
 | `INVE` | Inverte o sinal do topo: `M[s] = -M[s];` |
 | `CPIG` | Compara se igual: `M[s-1] = (M[s-1] == M[s] ? 1 : 0); s--;` |
-| `CDIF` | Compara se diferente: `M[s-1] = (M[s-1] != M[s] ? 1 : 0); s--;` |
+| `CDES` | Compara desigualdade (`!=`): `M[s-1] = (M[s-1] != M[s] ? 1 : 0); s--;` |
 | `CPMA` | Compara se maior: `M[s-1] = (M[s-1] > M[s] ? 1 : 0); s--;` |
 | `CPME` | Compara se menor: `M[s-1] = (M[s-1] < M[s] ? 1 : 0); s--;` |
 | `CMAI` | Compara se maior ou igual: `M[s-1] = (M[s-1] >= M[s] ? 1 : 0); s--;` |

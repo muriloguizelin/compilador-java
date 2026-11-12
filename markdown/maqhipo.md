@@ -61,7 +61,7 @@ Todas as instruções operam sobre números em ponto flutuante de dupla precisã
 | `DIVI` | - | `M[s-1] = M[s-1] / M[s]; s--;` | Divide o penúltimo elemento pelo topo (`M[s-1] / M[s]`). |
 | `INVE` | - | `M[s] = -M[s];` | Inversão de sinal do valor no topo da pilha (operador unário `-`). |
 | `CPIG` | - | `M[s-1] = (M[s-1] == M[s] ? 1 : 0); s--;` | Compara igualdade (`==`). Deixa `1.0` se verdadeiro, senão `0.0`. |
-| `CDIF` | - | `M[s-1] = (M[s-1] != M[s] ? 1 : 0); s--;` | Compara diferença (`!=`). Deixa `1.0` se verdadeiro, senão `0.0`. |
+| `CDES` | - | `M[s-1] = (M[s-1] != M[s] ? 1 : 0); s--;` | Compara desigualdade (`!=`). Deixa `1.0` se verdadeiro, senão `0.0`. |
 | `CPMA` | - | `M[s-1] = (M[s-1] > M[s] ? 1 : 0); s--;` | Compara maior que (`>`). |
 | `CPME` | - | `M[s-1] = (M[s-1] < M[s] ? 1 : 0); s--;` | Compara menor que (`<`). |
 | `CMAI` | - | `M[s-1] = (M[s-1] >= M[s] ? 1 : 0); s--;` | Compara maior ou igual (`>=`). |
@@ -71,10 +71,6 @@ Todas as instruções operam sobre números em ponto flutuante de dupla precisã
 | `LEIT` | - | `s++; M[s] = lerDouble();` | Lê valor double do teclado e empilha. |
 | `IMPR` | - | `print(M[s]); s--;` | Desempilha o valor do topo e imprime no console. |
 | `PARA` | - | `terminou = true;` | Encerra definitivamente a execução da máquina hipotética. |
-| `PUSHER`| `p` | `s++; M[s] = p;` | Empilha endereço de retorno $p$ (suporte a procedimentos). |
-| `PARAM` | `n` | `s++; M[s] = M[n];` | Empilha parâmetro no endereço $n$ (suporte a procedimentos). |
-| `CHPR` | `p` | `i = p;` | Chama procedimento em $p$ (suporte a procedimentos). |
-| `RTPR` | - | `i = (int) M[s]; s--;` | Retorna do procedimento para o endereço no topo. |
 
 ---
 

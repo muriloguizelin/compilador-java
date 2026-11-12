@@ -99,8 +99,6 @@ public class AnalisadorSemantico {
      * - Se encontrar qualquer outro token ID no meio dos comandos, verifica se já foi declarado!
      */
     private void percorrerComandos(ParserSLR.NoSintatico no) {
-        if (no == null) return;
-
         // 1. Declaração de variáveis (VAR -> TIPO VARS)
         if (no.naoTerminal == ParserSLR.NaoTerminal.VAR) {
             cadastrarVariaveis(no);
@@ -122,7 +120,6 @@ public class AnalisadorSemantico {
      * Cadastra na Tabela de Símbolos todos os nomes de variáveis (tokens ID) dentro de um bloco VAR.
      */
     private void cadastrarVariaveis(ParserSLR.NoSintatico no) {
-        if (no == null) return;
         if (no.getTipoToken() == Lexer.Tipo.ID) {
             tabela.inserir(no.token);
         }

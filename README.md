@@ -48,7 +48,7 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
 - **Implementação:** Analisador sintático ascendente (Shift-Reduce) operando com duas pilhas sincronizadas e tipadas (`pilhaDeEstados` e `pilhaDeNos`) consultando a tabela SLR(1).
 - **Decisão sobre as Tabelas ACTION, GOTO e Conjuntos FIRST/FOLLOW:**
   - A gramática do trabalho possui 23 não-terminais (24 com `START`), 44 regras de produção e 95 estados canônicos LR(0).
-  - Como a gramática da linguagem é fixa e imutável (`lalg-java.txt`), os conjuntos `FIRST`, `FOLLOW` e os estados de transição `ACTION` e `GOTO` foram pré-definidos diretamente em `TabelaSLR.java`, organizados através de 5 métodos de padrões reutilizáveis (`configurarHubDeComandos`, `configurarInicioExpressao`, `configurarInicioFator`, `configurarContinuacaoSoma` e `configurarContinuacaoMult`).
+  - Como a gramática da linguagem é fixa e imutável (`lalg-java.txt`), os conjuntos `FIRST`, `FOLLOW` e todos os estados de transição `ACTION` e `GOTO` (estados `0` a `94`) foram pré-definidos diretamente em ordem numérica dentro de `carregarEstadosSLR()` em `TabelaSLR.java`.
   - Seguindo a definição formal do SLR(1), o método `adicionarReduce(estadoAtual, numeroDaRegra)` utiliza diretamente o conjunto `FOLLOW(ladoEsquerdo)` do não-terminal à esquerda da regra para preencher as reduções válidas daquele estado.
 - **Ausência de Conflitos:** A gramática fornecida (`lalg-java.txt`) foi formalmente validada e pertence estritamente à classe SLR(1), apresentando 0 conflitos Shift/Reduce e 0 conflitos Reduce/Reduce. O uso explícito de blocos delimitados por chaves `{ ... }` em comandos `if` e `else` elimina o problema clássico de *dangling else*.
 
@@ -70,7 +70,7 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
   - `s`: apontador do topo da pilha de dados.
   - `M[]`: vetor linear de dados e pilha de operandos (com valores `double`).
 - **Execução:** O arquivo `codigo.objeto.txt` é carregado na memória de instruções (0-indexada). O ciclo de busca-decodificação-execução roda até encontrar a instrução `PARA`.
-- **Instruções Suportadas:** Operações aritméticas (`SOMA`, `SUBT`, `MULT`, `DIVI`, `INVE`), relacionais (`CPIG`, `CDIF`, `CPMA`, `CPME`, `CMAI`, `CPMI`), controle de fluxo (`DSVI`, `DSVF`), acesso à memória (`CRCT`, `CRVL`, `ARMZ`), alocação (`ALME`, `DESM`), chamadas de procedimento (`PUSHER`, `PARAM`, `CHPR`, `RTPR`) e entrada/saída no terminal (`LEIT`, `IMPR`).
+- **Instruções Suportadas:** Operações aritméticas (`SOMA`, `SUBT`, `MULT`, `DIVI`, `INVE`), relacionais (`CPIG`, `CDES`, `CPMA`, `CPME`, `CMAI`, `CPMI`), controle de fluxo (`DSVI`, `DSVF`), acesso à memória (`CRCT`, `CRVL`, `ARMZ`), alocação (`ALME`, `DESM`) e entrada/saída no terminal (`LEIT`, `IMPR`).
 
 ---
 
