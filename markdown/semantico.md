@@ -18,11 +18,11 @@ As principais responsabilidades do analisador semântico no compilador são:
 5. **Calcular o Mapeamento de Memória**: Atribuir a cada variável declarada um endereço relativo na pilha de execução da Máquina Hipotética ($0, 1, 2, \dots, m-1$).
 
 ```
-        [Redução Sintática no Parser SLR(1)]
+     [Árvore Sintática Concreta (CST) do Parser SLR(1)]
                          │
                          ▼
         +──────────────────────────────────+
-        |       Ações Semânticas           |
+        |   AnalisadorSemântico (CST)      |
         +──────────────────────────────────+
           │                              │
           ▼                              ▼
@@ -74,11 +74,11 @@ Qualquer variável utilizada em:
 - O lado esquerdo de uma atribuição (`CMD -> id RESTO_IDENT`)
 
 **Deve** ter sido previamente declarada em uma cláusula `DC -> VAR MAIS_CMDS`.
-- **Violação:** `Erro Semântico [Linha L, Coluna C]: Variável 'x' não foi declarada.`
+- **Violação:** `Erro Semantico na linha L, coluna C: Variavel 'x' utilizada sem declaracao previa`
 
 ### 3.2 Regra 2: Declaração Duplicada Proibida
 Não é permitido declarar dois identificadores com o mesmo nome no programa.
-- **Violação:** `Erro Semântico [Linha L, Coluna C]: Variável 'x' já foi declarada anteriormente na Linha X.`
+- **Violação:** `Erro Semantico na linha L, coluna C: Variavel 'x' ja declarada anteriormente na linha X`
 
 ### 3.3 Regra 3: Sistema de Tipos Unificado
 - A linguagem Java Simplificada (`lalg-java`) suporta unicamente o tipo numérico `double`.
@@ -146,16 +146,16 @@ A classe `SemanticException` reporta erros amigáveis e precisos:
 
 ```text
 ==========================================================================
-                       FALHA NA ANALISE SEMANTICA                         
+                        FALHA NA ANALISE SEMANTICA                           
 ==========================================================================
-Erro Semantico [Linha 7, Coluna 13]: Variavel 'total' nao foi declarada.
+Erro Semantico na linha 5, coluna 9: Variavel 'total' utilizada sem declaracao previa
 ==========================================================================
 ```
 ou
 ```text
 ==========================================================================
-                       FALHA NA ANALISE SEMANTICA                         
+                        FALHA NA ANALISE SEMANTICA                           
 ==========================================================================
-Erro Semantico [Linha 4, Coluna 16]: Variavel 'cont' ja declarada na linha 3.
+Erro Semantico na linha 5, coluna 16: Variavel 'x' ja declarada anteriormente na linha 3
 ==========================================================================
 ```

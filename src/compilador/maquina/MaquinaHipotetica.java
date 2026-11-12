@@ -9,16 +9,27 @@ import java.util.*;
 /**
  * PARTE 2: INTERPRETADOR DA MÁQUINA HIPOTÉTICA (CPU Virtual de Pilha)
  * 
- * Componentes da Máquina:
- * - M[] : Memória de dados (guarda variáveis nas primeiras posições e o resto funciona como pilha de contas).
- * - i   : Registrador de Instrução (aponta para a linha da próxima instrução a ser executada).
- * - s   : Registrador de Topo da Pilha (aponta para a posição atual no topo de M[]; começa em -1 = vazia).
+ * O que esta classe faz?
+ * Lê o arquivo "codigo.objeto.txt" gerado pelo compilador e executa as
+ * instruções
+ * uma por uma, simulando o funcionamento de um processador baseado em pilha.
+ * 
+ * Os 3 componentes principais da Máquina Hipotética:
+ * - M[] : Vetor de Memória de Dados (guarda as variáveis nas primeiras posições
+ * e usa o resto como pilha de contas).
+ * - i : Registrador de Instrução (Program Counter - guarda o número da linha da
+ * próxima instrução a ser executada).
+ * - s : Registrador de Topo da Pilha (Stack Pointer - aponta para a posição
+ * atual no topo da memória M[]).
  */
 public class MaquinaHipotetica {
 
+    /**
+     * Representa uma instrução carregada do arquivo "codigo.objeto.txt".
+     */
     public static class InstrucaoVM {
-        public final String operacao;
-        public final Double argumento;
+        public final String operacao; // Nome da instrução (ex: "INPP", "ALME", "CRCT", "SOMA")
+        public final Double argumento;// Valor numérico que acompanha a instrução (ou null se não tiver)
 
         public InstrucaoVM(String operacao, Double argumento) {
             this.operacao = operacao;
@@ -27,42 +38,89 @@ public class MaquinaHipotetica {
 
         @Override
         public String toString() {
-            if (argumento == null) return operacao;
-            if (argumento == argumento.longValue()) return operacao + " " + argumento.longValue();
+            if (argumento == null)
+                return operacao;
+            if (argumento == argumento.longValue())
+                return operacao + " " + argumento.longValue();
             return operacao + " " + argumento;
         }
     }
 
+    // Lista que guarda todas as linhas de instrução do programa carregado
     private final List<InstrucaoVM> programa = new ArrayList<>();
+
+    // M: Memória de dados (pilha onde ficam tanto as variáveis quanto os resultados
+    // das contas)
     private final double[] M = new double[10000];
-    private int i = 0;  // Linha da próxima instrução
-    private int s = -1; // Topo da pilha de dados M[]
+    // se chegar a 10000 vai quebrar tudo? como tratar?
+
+    // i: Apontador de instrução (diz qual linha do programa será executada agora;
+    // começa na linha 0)
+    private int i = 0;
+
+    // s: Apontador do topo da pilha M[] (começa em -1 porque no início a pilha está
+    // completamente vazia)
+    private int s = -1;
+
     private boolean modoTrace = false;
-    private final Scanner teclado = new Scanner(System.in);
+    private final Scanner leitorTeclado = new Scanner(System.in);
 
-    public void setModoTrace(boolean modoTrace) { this.modoTrace = modoTrace; }
-    public List<InstrucaoVM> getPrograma()      { return programa; }
+    public void setModoTrace(boolean modoTrace) {
+        this.modoTrace = modoTrace;
+    }
 
+    public List<InstrucaoVM> getPrograma() {
+        return programa;
+    }
+
+    /**
+     * Lê o arquivo de texto (ex: "codigo.objeto.txt") e transforma cada linha em
+     * uma InstrucaoVM.
+     */
     public void carregarArquivo(String caminhoArquivo) throws IOException {
         programa.clear();
-        for (String linha : Files.readAllLines(Path.of(caminhoArquivo), StandardCharsets.UTF_8)) {
-            linha = linha.trim();
-            if (linha.isEmpty() || linha.startsWith("#") || linha.startsWith("//")) continue;
-            if (linha.contains("#")) linha = linha.substring(0, linha.indexOf('#')).trim();
-            if (linha.contains(":")) linha = linha.split(":", 2)[1].trim();
+        List<String> linhasDoArquivo = Files.readAllLines(Path.of(caminhoArquivo), StandardCharsets.UTF_8);
 
+        for (String linha : linhasDoArquivo) {
+            linha = linha.trim();
+
+            // Ignora linhas em branco ou linhas de comentário
+            if (linha.isEmpty() || linha.startsWith("#") || linha.startsWith("//")) {
+                continue;
+            }
+            // é para vir sem linha vazia ou comentada ne
+
+            // Remove comentários no final da linha (ex: "DSVI 4 # volta pro while")
+            if (linha.contains("#")) {
+                linha = linha.substring(0, linha.indexOf('#')).trim();
+            }
+            // tambem é pra vir sem comentario ne
+
+            // Remove prefixo de número de linha caso exista (ex: "0: INPP" vira "INPP")
+            if (linha.contains(":")) {
+                linha = linha.split(":", 2)[1].trim();
+            }
+            // tambem é pra vir sem isso
+
+            // Divide a linha por espaço: a 1ª parte é o nome da operação e a 2ª (se
+            // existir) é o número (argumento)
             String[] partes = linha.split("\\s+");
             String operacao = partes[0].toUpperCase();
             Double argumento = (partes.length > 1) ? Double.parseDouble(partes[1]) : null;
+
             programa.add(new InstrucaoVM(operacao, argumento));
         }
     }
 
+    /**
+     * Executa o programa carregado, instrução por instrução, até encontrar "PARA".
+     */
     public void executar() {
-        i = 0;
-        s = -1;
+        i = 0; // Começa na instrução de linha 0
+        s = -1; // Começa com a pilha vazia (-1)
         Arrays.fill(M, 0.0);
-        boolean rodando = true;
+
+        boolean maquinaRodando = true;
         int ciclo = 0;
 
         if (modoTrace) {
@@ -70,68 +128,197 @@ public class MaquinaHipotetica {
             System.out.println("-------+------+-----------------+------+------------------");
         }
 
-        while (rodando && i >= 0 && i < programa.size()) {
+        while (maquinaRodando && i >= 0 && i < programa.size()) {
             ciclo++;
-            int linhaAtual = i++; // Lê a linha atual e já avança 'i' para a próxima instrução
-            InstrucaoVM inst = programa.get(linhaAtual);
-            int argInt = (inst.argumento != null) ? inst.argumento.intValue() : 0;
+
+            // Busca a instrução da linha atual (i) e já avança o 'i' para a linha seguinte
+            // por padrão
+            int linhaExecutada = i;
+            InstrucaoVM instrucao = programa.get(linhaExecutada);
+            i = i + 1;
 
             if (modoTrace) {
-                String topo = (s >= 0) ? String.format("%.2f", M[s]) : "vazia";
-                System.out.printf("%-6d | %-4d | %-15s | %-4d | %s%n", ciclo, linhaAtual, inst, s, topo);
+                String valorNoTopo = (s >= 0) ? String.format("%.2f", M[s]) : "vazia";
+                System.out.printf("%-6d | %-4d | %-15s | %-4d | %s%n",
+                        ciclo, linhaExecutada, instrucao, s, valorNoTopo);
             }
 
-            switch (inst.operacao) {
-                // --- Controle de Memória e Programa ---
-                case "INPP": s = -1; break;                                   // Inicia programa (pilha vazia)
-                case "ALME": s += argInt; break;                              // Aloca memória para 'argInt' variáveis
-                case "DESM": s -= argInt; break;                              // Desaloca memória das variáveis
-                case "PARA": rodando = false; break;                          // Encerra a execução da máquina
+            switch (instrucao.operacao) {
 
-                // --- Movimentação de Dados ---
-                case "CRCT": s++; M[s] = inst.argumento; break;               // Carrega Constante numérica no topo
-                case "CRVL": s++; M[s] = M[argInt]; break;                    // Carrega Valor da variável M[argInt] no topo
-                case "ARMZ": M[argInt] = M[s]; s--; break;                    // Armazena o topo na variável M[argInt]
+                // ==============================================================
+                // 1. CONTROLE DE MEMÓRIA E PROGRAMA
+                // ==============================================================
 
-                // --- Operações Aritméticas (entre o penúltimo M[s-1] e o topo M[s]) ---
-                case "SOMA": M[s - 1] = M[s - 1] + M[s]; s--; break;          // Soma
-                case "SUBT": M[s - 1] = M[s - 1] - M[s]; s--; break;          // Subtração
-                case "MULT": M[s - 1] = M[s - 1] * M[s]; s--; break;          // Multiplicação
-                case "DIVI":                                                  // Divisão (checa divisor zero no topo)
-                    if (M[s] == 0.0) throw new ArithmeticException("Erro em tempo de execucao: Divisao por zero na linha " + linhaAtual);
-                    M[s - 1] = M[s - 1] / M[s]; s--;
+                case "INPP": // Iniciar Programa Principal: garante que a pilha começa vazia
+                    s = -1;
                     break;
-                case "INVE": M[s] = -M[s]; break;                             // Inverte o sinal do topo (-x)
 
-                // --- Comparações Relacionais (1.0 = Verdadeiro, 0.0 = Falso) ---
-                case "CPIG": M[s - 1] = (M[s - 1] == M[s]) ? 1.0 : 0.0; s--; break; // Igual (==)
-                case "CDIF": M[s - 1] = (M[s - 1] != M[s]) ? 1.0 : 0.0; s--; break; // Diferente (!=)
-                case "CPMA": M[s - 1] = (M[s - 1] >  M[s]) ? 1.0 : 0.0; s--; break; // Maior (>)
-                case "CPME": M[s - 1] = (M[s - 1] <  M[s]) ? 1.0 : 0.0; s--; break; // Menor (<)
-                case "CMAI": M[s - 1] = (M[s - 1] >= M[s]) ? 1.0 : 0.0; s--; break; // Maior ou Igual (>=)
-                case "CPMI": M[s - 1] = (M[s - 1] <= M[s]) ? 1.0 : 0.0; s--; break; // Menor ou Igual (<=)
+                case "ALME": // Alocar Memória: avança 's' para reservar espaço para as variáveis declaradas
+                    int qtdAlocar = instrucao.argumento.intValue();
+                    s = s + qtdAlocar;
+                    break;
 
-                // --- Saltos / Desvios (if, else, while) ---
-                case "DSVI": i = argInt; break;                               // Desvio Incondicional: pula para 'argInt'
-                case "DSVF": if (M[s] == 0.0) i = argInt; s--; break;         // Desvio Se Falso (0.0): pula para 'argInt'
+                case "DESM": // Desalocar Memória: libera o espaço reservado para as variáveis
+                    int qtdDesalocar = instrucao.argumento.intValue();
+                    s = s - qtdDesalocar;
+                    break;
 
-                // --- Entrada e Saída ---
-                case "LEIT":                                                  // Lê um double do teclado e empilha
+                case "PARA": // Parar: encerra a execução da Máquina Hipotética
+                    maquinaRodando = false;
+                    break;
+
+                // ==============================================================
+                // 2. MOVIMENTAÇÃO DE DADOS (EMPILHAR E SALVAR VARIÁVEIS)
+                // ==============================================================
+
+                case "CRCT": // Carregar Constante: coloca um número literal (ex: 10) no topo da pilha
+                    s = s + 1;
+                    M[s] = instrucao.argumento;
+                    break;
+
+                case "CRVL": // Carregar Valor: busca o valor de uma variável na memória e coloca no topo da
+                             // pilha
+                    int enderecoOrigem = instrucao.argumento.intValue();
+                    s = s + 1;
+                    M[s] = M[enderecoOrigem];
+                    break;
+
+                case "ARMZ": // Armazenar: pega o valor no topo da pilha, salva na variável e desempilha
+                    int enderecoDestino = instrucao.argumento.intValue();
+                    M[enderecoDestino] = M[s];
+                    s = s - 1;
+                    break;
+
+                // ==============================================================
+                // 3. OPERAÇÕES ARITMÉTICAS (CONTAS MATEMÁTICAS)
+                // Sempre operam sobre o penúltimo valor (M[s-1]) e o topo (M[s])
+                // ==============================================================
+
+                case "SOMA": // Soma: M[s-1] + M[s]
+                    M[s - 1] = M[s - 1] + M[s];
+                    s = s - 1;
+                    break;
+
+                case "SUBT": // Subtração: M[s-1] - M[s]
+                    M[s - 1] = M[s - 1] - M[s];
+                    s = s - 1;
+                    break;
+
+                case "MULT": // Multiplicação: M[s-1] * M[s]
+                    M[s - 1] = M[s - 1] * M[s];
+                    s = s - 1;
+                    break;
+
+                case "DIVI": // Divisão: M[s-1] / M[s] (verifica se o divisor no topo é zero)
+                    if (M[s] == 0.0) {
+                        throw new ArithmeticException(
+                                "Erro em tempo de execucao: Divisao por zero na linha " + linhaExecutada);
+                    }
+                    M[s - 1] = M[s - 1] / M[s];
+                    s = s - 1;
+                    break;
+
+                case "INVE": // Inverter sinal: troca o sinal do número no topo da pilha (ex: 5 vira -5)
+                    M[s] = -M[s];
+                    break;
+
+                // ==============================================================
+                // 4. OPERAÇÕES RELACIONAIS (COMPARAÇÕES)
+                // Deixam 1.0 no topo se for VERDADEIRO, ou 0.0 se for FALSO
+                // ==============================================================
+
+                case "CPIG": // Comparar se é Igual (==)
+                    M[s - 1] = (M[s - 1] == M[s]) ? 1.0 : 0.0;
+                    s = s - 1;
+                    break;
+
+                case "CDIF": // Comparar se é Diferente (!=)
+                    M[s - 1] = (M[s - 1] != M[s]) ? 1.0 : 0.0;
+                    s = s - 1;
+                    break;
+
+                case "CPMA": // Comparar se é Maior (>)
+                    M[s - 1] = (M[s - 1] > M[s]) ? 1.0 : 0.0;
+                    s = s - 1;
+                    break;
+
+                case "CPME": // Comparar se é Menor (<)
+                    M[s - 1] = (M[s - 1] < M[s]) ? 1.0 : 0.0;
+                    s = s - 1;
+                    break;
+
+                case "CMAI": // Comparar se é Maior ou Igual (>=)
+                    M[s - 1] = (M[s - 1] >= M[s]) ? 1.0 : 0.0;
+                    s = s - 1;
+                    break;
+
+                case "CPMI": // Comparar se é Menor ou Igual (<=)
+                    M[s - 1] = (M[s - 1] <= M[s]) ? 1.0 : 0.0;
+                    s = s - 1;
+                    break;
+
+                // ==============================================================
+                // 5. DESVIOS / SALTOS (USADOS PELO IF, ELSE E WHILE)
+                // ==============================================================
+
+                case "DSVI": // Desvio Incondicional: muda 'i' para pular sempre para a linha indicada
+                    i = instrucao.argumento.intValue();
+                    break;
+
+                case "DSVF": // Desvio Se Falso: desempilha o topo; se for 0.0 (falso), pula para a linha
+                             // indicada
+                    double resultadoCondicao = M[s];
+                    s = s - 1;
+                    if (resultadoCondicao == 0.0) {
+                        i = instrucao.argumento.intValue();
+                    }
+                    break;
+
+                // ==============================================================
+                // 6. ENTRADA (LEITURA DO TECLADO) E SAÍDA (IMPRESSÃO NA TELA)
+                // ==============================================================
+
+                case "LEIT": // Leitura: pede um número no terminal e empilha no topo de M[]
                     System.out.print("[LEITURA] Digite um numero (double): ");
-                    s++; M[s] = teclado.nextDouble();
-                    break;
-                case "IMPR":                                                  // Desempilha o topo e imprime na tela
-                    double val = M[s]; s--;
-                    System.out.println(val == (long) val ? String.valueOf((long) val) : String.valueOf(val));
+                    s = s + 1;
+                    M[s] = leitorTeclado.nextDouble();
                     break;
 
-                // --- Procedimentos ---
-                case "PUSHER": s++; M[s] = inst.argumento; break;             // Empilha linha de retorno
-                case "PARAM":  s++; M[s] = M[argInt]; break;                  // Empilha parâmetro
-                case "CHPR":   i = argInt; break;                             // Chama procedimento
-                case "RTPR":   i = (int) M[s]; s--; break;                    // Retorna do procedimento
+                case "IMPR": // Impressão: retira o valor do topo da pilha e mostra na tela
+                    double valorParaImprimir = M[s];
+                    s = s - 1;
+                    if (valorParaImprimir == (long) valorParaImprimir) {
+                        System.out.println((long) valorParaImprimir);
+                    } else {
+                        System.out.println(valorParaImprimir);
+                    }
+                    break;
+
+                // ==============================================================
+                // 7. SUPORTE A PROCEDIMENTOS (CHAMADAS DE FUNÇÃO)
+                // ==============================================================
+
+                case "PUSHER": // Empilha o endereço de retorno antes de chamar um procedimento
+                    s = s + 1;
+                    M[s] = instrucao.argumento;
+                    break;
+
+                case "PARAM": // Copia um parâmetro da memória para o topo da pilha
+                    s = s + 1;
+                    M[s] = M[instrucao.argumento.intValue()];
+                    break;
+
+                case "CHPR": // Chama o procedimento desviando para a linha indicada
+                    i = instrucao.argumento.intValue();
+                    break;
+
+                case "RTPR": // Retorna do procedimento voltando para a linha que estava salva no topo
+                    i = (int) M[s];
+                    s = s - 1;
+                    break;
+
                 default:
-                    throw new UnsupportedOperationException("Instrucao desconhecida: " + inst.operacao);
+                    throw new UnsupportedOperationException("Instrucao desconhecida: " + instrucao.operacao);
             }
         }
     }

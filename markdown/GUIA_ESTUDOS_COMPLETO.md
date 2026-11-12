@@ -10,7 +10,7 @@
 ## ÍNDICE GERAL
 
 1. [Módulo 0: Respostas às Suas Dúvidas Anotadas no Código](#módulo-0-respostas-às-suas-dúvidas-anotadas-no-código)
-2. [Módulo 1: O Analisador Léxico (Lexer) & Por que cada TokenTipo existe](#módulo-1-o-analisador-léxico-lexer--por-que-cada-tokentipo-existe)
+2. [Módulo 1: O Analisador Léxico (Lexer) & Por que cada Lexer.Tipo existe](#módulo-1-o-analisador-léxico-lexer--por-que-cada-lexertipo-existe)
 3. [Módulo 2: O Analisador Sintático Ascendente SLR(1) (Teoria e Prática Completa)](#módulo-2-o-analisador-sintático-ascendente-slr1-teoria-e-prática-completa)
 4. [Módulo 3: O Cálculo Matemático de FIRST, FOLLOW e a Tabela SLR(1)](#módulo-3-o-cálculo-matemático-de-first-follow-e-a-tabela-slr1)
 5. [Módulo 4: O Analisador Semântico & A Tabela de Símbolos](#módulo-4-o-analisador-semântico--a-tabela-de-símbolos)
@@ -82,9 +82,9 @@ private void adicionarReduce(int estadoAtual, int numeroDaRegra) {
 
 ---
 
-## MÓDULO 1: O Analisador Léxico (Lexer) & Por que cada TokenTipo existe
+## MÓDULO 1: O Analisador Léxico (Lexer) & Por que cada Lexer.Tipo existe
 
-O analisador léxico converte o texto contínuo em tokens estruturados. A gramática formal `lalg-java` possui **33 símbolos terminais**. Cada um tem um `TokenTipo` dedicado:
+O analisador léxico converte o texto contínuo em tokens estruturados. A gramática formal `lalg-java` possui **33 símbolos terminais**. Cada um tem um `Lexer.Tipo` dedicado:
 
 ### 1.1 Palavras Reservadas da Estrutura Java
 - `PUBLIC ("public")`: Modificador da classe e do método `main`.
@@ -217,7 +217,6 @@ Cada variável declarada recebe:
 - **`tipo`**: `double`.
 - **`endereco`**: Endereço linear de memória na Máquina Hipotética ($0, 1, 2, 3$).
 - **`linha` e `coluna`**: Posição onde foi declarada.
-- **`inicializada`**: Booleano que marca se a variável já recebeu algum valor por atribuição.
 
 ### 4.2 As Duas Validações Semânticas Centrais:
 1. **Declaração Duplicada:** Se uma variável for declarada duas vezes (ex: `double a; ... double a;`), o compilador dispara `SemanticException: Variavel 'a' ja declarada na linha X`.
@@ -250,7 +249,7 @@ A Máquina Hipotética simula uma CPU baseada em pilha:
 
 | Instrução | O que faz na memória e na pilha |
 | :--- | :--- |
-| `INPP` | Inicializa a máquina: `s = -1; i = 0;` |
+| `INPP` | Inicializa o topo da pilha da máquina: `s = -1;` |
 | `ALME m` | Reserva espaço para $m$ variáveis locais: `s = s + m;` |
 | `DESM m` | Libera $m$ posições da memória: `s = s - m;` |
 | `CRCT k` | Carrega constante $k$ no topo: `s++; M[s] = k;` |
@@ -403,7 +402,7 @@ Aqui estão as 7 perguntas exatas que o professor/banca costuma fazer e como voc
 
 ### 1. Compilação do Projeto Java:
 ```powershell
-javac -d bin -sourcepath src src/compilador/MainCompilador.java src/compilador/maquina/MainMaquina.java
+javac -encoding UTF-8 -d bin src/compilador/*.java src/compilador/maquina/*.java
 ```
 
 ---

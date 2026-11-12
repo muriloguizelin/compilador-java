@@ -118,7 +118,7 @@ A Máquina Hipotética funciona com dois ponteiros principais:
 
 | Instrução | O que a linha faz na memória/pilha | Por que é gerada nessa ordem? |
 | :--- | :--- | :--- |
-| `INPP` | Inicializa os ponteiros (`s = -1`, `i = 0`). | Deve ser SEMPRE a primeira instrução executada. |
+| `INPP` | Inicializa o ponteiro do topo da pilha (`s = -1`). | Deve ser SEMPRE a primeira instrução executada. |
 | `ALME m` | Reserva `m` posições na pilha de dados (`s = s + m`). | Aloca o espaço de memória para as variáveis declaradas no programa. |
 | `CRCT k` | Empilha o valor constante `k` (`s++; M[s] = k`). | Sempre que um número literal (ex: `10`) aparece no código fonte. |
 | `CRVL n` | Empilha o valor da variável que está no endereço `n` (`s++; M[s] = M[n]`). | Sempre que o valor de uma variável é lido em uma expressão ou condição. |
@@ -257,4 +257,4 @@ System.out.println(c);
    *Resposta:* "Porque a gramática exige chaves obrigatórias `{ ... }` em volta dos blocos `if` e `else`. O `else` nunca está no conjunto `FOLLOW(CMDS)`, então quando o parser vê um `else`, a única ação válida possível é deslocar (Shift)."
 
 4. **"Como o compilador calcula os endereços dos desvios `DSVF` e `DSVI` se ele ainda não compilou o resto do código?"**  
-   *Resposta:* "Através da técnica de **Backpatching** (preenchimento posterior): quando o compilador emite o `DSVF`, ele deixa o endereço vazio e empilha o índice dessa instrução. Assim que o bloco do `if` ou `while` é finalizado, ele sabe a linha atual e atualiza a instrução anterior com o endereço de destino correto."
+   *Resposta:* "Através da técnica de **Backpatching** (preenchimento posterior): quando o tradutor emite o `DSVF`, ele coloca um endereço provisório (`-1`) e guarda o índice dessa instrução (`linhaDsvf`). Assim que o bloco do `if` ou `while` é finalizado, ele chama `corrigirDesvio(linhaDsvf, listaInstrucoes.size())` e atualiza a instrução anterior com o endereço de destino correto."

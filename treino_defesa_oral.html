@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Treino de Defesa Oral — Flashcards & Simulado (Compilador SLR(1) + Máquina Hipotética)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .code-font { font-family: Consolas, 'JetBrains Mono', 'Courier New', monospace; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-4 md:p-6">
+  <div class="max-w-6xl mx-auto flex flex-col gap-4">
+
+    <!-- Top Header & Mode Switcher -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 md:p-5 shadow-sm flex flex-col gap-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">Preparação Máxima • Sabatina do Professor</span>
+          <h1 class="text-xl md:text-2xl font-bold text-[var(--foreground)] mt-0.5">
+            Treinador Interativo: "O Que Este Trecho Faz?"
+          </h1>
+          <p class="text-xs md:text-sm text-[var(--muted-foreground)]">
+            Analise o trecho de código, escreva sua explicação no rascunho, confira as palavras-chave e compare com a resposta oficial da banca.
+          </p>
+        </div>
+
+        <!-- Stats Pills -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="px-3 py-1.5 rounded-xl bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold">
+            🟢 Dominados: <span id="stat-mastered" class="font-bold text-[#22c55e]">0</span> / <span id="stat-total">36</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold">
+            🟡 Quase lá: <span id="stat-learning" class="font-bold text-[#eab308]">0</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold">
+            🔴 Revisar: <span id="stat-review" class="font-bold text-[#ef4444]">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[var(--border)]">
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="tab-flashcards" onclick="switchMode('flashcards')"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--primary)] text-[var(--primary-foreground)] transition">
+            🗂️ Flashcards de Código (36)
+          </button>
+          <button id="tab-quiz" onclick="switchMode('quiz')"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)] transition">
+            📝 Questionário / Simulado (20)
+          </button>
+          <button id="tab-catalog" onclick="switchMode('catalog')"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)] transition">
+            📋 Ver Todas as 36 Perguntas
+          </button>
+        </div>
+
+        <!-- Category Filter (For Flashcards) -->
+        <div id="filter-container" class="flex items-center gap-2 flex-wrap">
+          <label class="text-xs font-semibold text-[var(--muted-foreground)]">Filtrar:</label>
+          <select id="category-select" onchange="applyFilter(this.value)"
+            class="bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)] rounded-xl px-3 py-1.5 text-xs font-semibold outline-none">
+            <option value="ALL">Todos os 36 Flashcards</option>
+            <option value="GRAMATICA">1. Gramática & FIRST/FOLLOW (6)</option>
+            <option value="LEXER">2. Lexer.java — Analisador Léxico (6)</option>
+            <option value="TABELASLR">3. TabelaSLR.java — Estados e Tabelas (6)</option>
+            <option value="PARSERSLR">4. ParserSLR.java — Motor Shift-Reduce (4)</option>
+            <option value="SEMANTICO">5. AnalisadorSemantico.java — Símbolos (4)</option>
+            <option value="TRADUTOR">6. TradutorCodigo.java — Código & Backpatching (5)</option>
+            <option value="MAQUINA">7. MaquinaHipotetica.java & Código Objeto (5)</option>
+            <option value="NEED_REVIEW">🔴 Apenas os que marquei "Preciso Revisar"</option>
+            <option value="NOT_MASTERED">⚡ Apenas os ainda não dominados</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODE 1: FLASHCARDS VIEW                                                   -->
+    <!-- ========================================================================= -->
+    <div id="view-flashcards" class="flex flex-col gap-4">
+
+      <!-- Card Top Controls -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="fc-counter" class="px-3 py-1 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold">
+            CARD 1 / 36
+          </span>
+          <span id="fc-badge-file" class="px-2.5 py-1 rounded-lg bg-[var(--secondary)] border border-[var(--border)] text-xs font-mono font-semibold">
+          </span>
+          <span id="fc-status-pill" class="px-2.5 py-1 rounded-lg text-xs font-bold"></span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="prevCard()" class="px-3 py-1.5 rounded-lg bg-[var(--secondary)] border border-[var(--border)] text-xs font-bold hover:opacity-80">
+            ◀ Anterior
+          </button>
+          <button onclick="randomCard()" class="px-3 py-1.5 rounded-lg bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold hover:opacity-80" title="Sortear pergunta aleatória como na defesa">
+            🎲 Sortear Pergunta
+          </button>
+          <button onclick="nextCard()" class="px-3 py-1.5 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold hover:opacity-90">
+            Próximo ▶
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Flashcard Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- Left Column: Code Snippet + Professor's Question -->
+        <div class="lg:col-span-7 flex flex-col gap-4">
+          <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 shadow-sm flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <span id="fc-category" class="text-xs font-bold uppercase tracking-wider text-[var(--primary)]"></span>
+              <span id="fc-lines" class="text-xs font-mono text-[var(--muted-foreground)]"></span>
+            </div>
+
+            <h2 id="fc-question" class="text-base md:text-lg font-bold text-[var(--foreground)] leading-snug"></h2>
+
+            <!-- Code Box -->
+            <div class="bg-[#0d1117] text-[#e6edf3] border border-[#30363d] rounded-xl overflow-hidden flex flex-col">
+              <div class="bg-[#161b22] border-b border-[#30363d] px-4 py-2 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f56]"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"></span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#27c93f]"></span>
+                  <span id="fc-code-title" class="ml-1.5 text-xs font-bold text-[#79c0ff] code-font"></span>
+                </div>
+                <span class="text-xs text-[#8b949e]">Trecho em Análise</span>
+              </div>
+              <pre id="fc-code" class="p-4 text-xs md:text-[13px] leading-relaxed overflow-x-auto code-font select-text"></pre>
+            </div>
+
+            <!-- Hint Box -->
+            <div class="flex items-center justify-between pt-1">
+              <button onclick="toggleHint()" class="px-3 py-1.5 rounded-lg bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold hover:opacity-80">
+                💡 Precisa de um empurrãozinho? Ver Dica
+              </button>
+              <span class="text-xs text-[var(--muted-foreground)]">Escreva ao lado antes de abrir a resposta!</span>
+            </div>
+            <div id="fc-hint-box" class="hidden p-3 rounded-xl bg-[var(--secondary)] border border-[var(--border)] text-xs text-[var(--foreground)] leading-relaxed">
+              <strong class="text-[var(--primary)]">💡 Dica de Raciocínio:</strong> <span id="fc-hint-text"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: User Input Scratchpad + Key Term Checker -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+          <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 flex flex-col gap-3 shadow-sm flex-1">
+            <div class="flex items-center justify-between">
+              <label for="fc-user-input" class="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+                ✍️ Sua Resposta (Escreva com suas palavras):
+              </label>
+              <button onclick="clearCurrentNote()" class="text-xs text-[var(--muted-foreground)] hover:underline">
+                Limpar texto
+              </button>
+            </div>
+
+            <textarea id="fc-user-input" rows="6"
+              oninput="handleNoteInput(this.value)"
+              placeholder="Escreva aqui: O que esse trecho faz? Por que foi feito assim? O que aconteceria se não existisse?..."
+              class="w-full rounded-xl bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)] p-3.5 text-sm leading-relaxed outline-none focus:border-[var(--primary)] resize-y"></textarea>
+
+            <!-- Live Keyword Thermometer -->
+            <div class="p-3 rounded-xl bg-[var(--secondary)] border border-[var(--border)] flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-[var(--foreground)]">🎯 Termos-Chave Detectados no Seu Texto:</span>
+                <span id="fc-kw-count" class="text-xs font-bold text-[var(--primary)]">0 / 0</span>
+              </div>
+              <div id="fc-kw-pills" class="flex flex-wrap gap-1.5"></div>
+              <p class="text-xs text-[var(--muted-foreground)]">
+                Os termos ficam verdes automaticamente conforme você os menciona na sua explicação (ou quando revela a resposta).
+              </p>
+            </div>
+
+            <!-- Reveal Answer Button -->
+            <button id="btn-reveal" onclick="toggleAnswer()"
+              class="w-full py-3 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-bold shadow-sm hover:opacity-95 transition">
+              👁️ Revelar Resposta Oficial do Professor
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Official Answer Box (Hidden until revealed) -->
+      <div id="fc-answer-panel" class="hidden bg-[var(--card)] border-2 border-[var(--primary)] rounded-2xl p-5 shadow-md flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[var(--border)]">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">✅ Gabarito Oficial de Defesa Oral</span>
+            <h3 class="text-base font-bold text-[var(--foreground)]">Compare o que você escreveu com a resposta abaixo:</h3>
+          </div>
+
+          <!-- Self Rating Buttons -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-semibold text-[var(--muted-foreground)] mr-1">Autoavaliação:</span>
+            <button onclick="rateCard('review')" class="px-3 py-1.5 rounded-lg bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/40 text-xs font-bold hover:opacity-80">
+              🔴 Preciso Revisar
+            </button>
+            <button onclick="rateCard('learning')" class="px-3 py-1.5 rounded-lg bg-[#eab308]/15 text-[#eab308] border border-[#eab308]/40 text-xs font-bold hover:opacity-80">
+              🟡 Quase lá
+            </button>
+            <button onclick="rateCard('mastered')" class="px-3 py-1.5 rounded-lg bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/40 text-xs font-bold hover:opacity-80">
+              🟢 Dominei! (Próximo ▶)
+            </button>
+          </div>
+        </div>
+
+        <!-- Direct 10-second Answer -->
+        <div class="p-4 rounded-xl bg-[var(--secondary)] border-l-4 border-l-[var(--primary)]">
+          <div class="text-xs font-bold uppercase tracking-wider text-[var(--primary)] mb-1">
+            🎙️ Resposta Direta (O que responder em 10 segundos na apresentação):
+          </div>
+          <p id="fc-short-answer" class="text-sm font-semibold text-[var(--foreground)] leading-relaxed"></p>
+        </div>
+
+        <!-- Detailed Line-by-Line Breakdown -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="fc-detailed-points"></div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODE 2: QUIZ / SIMULADO VIEW                                              -->
+    <!-- ========================================================================= -->
+    <div id="view-quiz" class="hidden flex flex-col gap-4">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border)]">
+          <div class="flex items-center gap-3">
+            <span id="qz-counter" class="px-3 py-1 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold">
+              QUESTÃO 1 / 20
+            </span>
+            <span id="qz-topic" class="text-xs font-bold uppercase tracking-wider text-[var(--primary)]"></span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold px-3 py-1 rounded-lg bg-[var(--secondary)] border border-[var(--border)]">
+              🏆 Acertos: <span id="qz-score" class="text-[#22c55e]">0</span> / <span id="qz-answered">0</span>
+            </span>
+            <button onclick="resetQuiz()" class="px-3 py-1 rounded-lg bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold hover:opacity-80">
+              🔄 Reiniciar Simulado
+            </button>
+          </div>
+        </div>
+
+        <h2 id="qz-question" class="text-base md:text-lg font-bold text-[var(--foreground)]"></h2>
+
+        <!-- Quiz Code Snippet -->
+        <div class="bg-[#0d1117] text-[#e6edf3] border border-[#30363d] rounded-xl overflow-hidden">
+          <pre id="qz-code" class="p-4 text-xs md:text-[13px] leading-relaxed overflow-x-auto code-font select-text"></pre>
+        </div>
+
+        <!-- Optional Justification Field before clicking option -->
+        <div class="flex flex-col gap-1.5">
+          <label for="qz-user-reason" class="text-xs font-bold text-[var(--muted-foreground)]">
+            💭 Rascunho de Justificativa (Opcional — anote por que sua escolha está certa antes de clicar):
+          </label>
+          <input id="qz-user-reason" type="text"
+            oninput="saveQuizNote(this.value)"
+            placeholder="Ex: Porque na máquina de pilha o dividendo entra primeiro em s-1 e o divisor fica no topo s..."
+            class="w-full rounded-xl bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)] px-3.5 py-2 text-xs outline-none focus:border-[var(--primary)]" />
+        </div>
+
+        <!-- Options List -->
+        <div id="qz-options" class="grid grid-cols-1 gap-2.5"></div>
+
+        <!-- Quiz Feedback Box -->
+        <div id="qz-feedback" class="hidden p-4 rounded-xl border text-sm leading-relaxed"></div>
+
+        <!-- Quiz Footer Nav -->
+        <div class="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+          <button onclick="prevQuiz()" class="px-4 py-2 rounded-xl bg-[var(--secondary)] border border-[var(--border)] text-xs font-bold">
+            ◀ Questão Anterior
+          </button>
+          <button onclick="nextQuiz()" class="px-4 py-2 rounded-xl bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold">
+            Próxima Questão ▶
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODE 3: CATALOG / ALL 36 CARDS VIEW                                       -->
+    <!-- ========================================================================= -->
+    <div id="view-catalog" class="hidden flex flex-col gap-3">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-[var(--foreground)]">Índice Geral dos 36 Flashcards de Código</h2>
+            <p class="text-xs text-[var(--muted-foreground)]">Clique em qualquer cartão para abrir e praticar sua resposta escrita.</p>
+          </div>
+          <button onclick="resetAllProgress()" class="px-3 py-1.5 rounded-lg bg-[var(--secondary)] border border-[var(--border)] text-xs font-semibold text-[#ef4444]">
+            🗑️ Limpar Todo o Progresso Salvo
+          </button>
+        </div>
+        <div id="catalog-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ============================================================================
+    // BANCO COMPLETO DE 36 FLASHCARDS DE TRECHOS DE CÓDIGO E TEORIA
+    // ============================================================================
+    const FLASHCARDS = [
+      // ---------------- 1. GRAMÁTICA & FIRST/FOLLOW (6) ----------------
+      {
+        id: 1,
+        cat: "GRAMATICA",
+        catName: "1. Gramática lalg-java.txt",
+        file: "lalg-java.txt",
+        lines: "Linha 1 (Regra R1)",
+        codeTitle: "lalg-java.txt — Regra R1 (PROG)",
+        code: `PROG -> public class id {\n          public static void main ( String [ ] id ) {\n            <CMDS>\n          }\n        }`,
+        question: "1. O que esta regra inicial define, por que existem dois 'id' nela e qual é o índice do filho <CMDS>?",
+        hint: "Pense no nome da classe vs. nome do argumento do main, e conte os símbolos de 0 até 17.",
+        keywords: ["axioma", "classe", "args", "15", "main"],
+        shortAnswer: "Define o cabeçalho obrigatório do programa Java. O 1º 'id' é o nome da classe (ex: Teste), o 2º 'id' é o parâmetro do método main (ex: args), e o bloco <CMDS> fica exatamente no filho de índice 15 (entre os 18 símbolos de 0 a 17).",
+        details: [
+          ["Por que dois tokens 'id'?", "Em 'public class Teste { public static void main(String[] args)', tanto 'Teste' quanto 'args' são identificadores (Tipo.ID)."],
+          ["Por que o índice 15 é importante?", "No AnalisadorSemantico.java (linha 92), chamamos noRaizProg.getFilho(15) para pular os 15 tokens do cabeçalho (0 a 14) e analisar apenas as variáveis dentro de <CMDS>."]
+        ]
+      },
+      {
+        id: 2,
+        cat: "GRAMATICA",
+        catName: "1. Gramática lalg-java.txt",
+        file: "lalg-java.txt",
+        lines: "Linhas 2 a 6 (Regras R2 a R7)",
+        codeTitle: "lalg-java.txt — Declaração de Variáveis",
+        code: `R2: DC       -> <VAR> <MAIS_CMDS>\nR3: VAR      -> <TIPO> <VARS>\nR4: VARS     -> id <MAIS_VAR>\nR5: MAIS_VAR -> , <VARS>\nR6: MAIS_VAR -> λ\nR7: TIPO     -> double`,
+        question: "2. Como essas regras funcionam juntas para declarar variáveis (ex: 'double a, b, c;') e por que MAIS_VAR tem λ (vazio)?",
+        hint: "Veja onde entra a vírgula, onde termina a lista de variáveis e de onde vem o ponto-e-vírgula obrigatório.",
+        keywords: ["recursão", "vírgula", "vazio", "ponto-e-vírgula", "double"],
+        shortAnswer: "Elas permitem declarar uma ou mais variáveis do tipo 'double' na mesma linha separadas por vírgula. O 'MAIS_VAR -> , VARS' cria a recursão para ler mais variáveis após a vírgula, o 'λ' (vazio) permite encerrar a lista quando não há mais vírgulas, e 'MAIS_CMDS' obriga o ';' no final.",
+        details: [
+          ["Por que só existe o tipo 'double'?", "Para simplificar a verificação de tipos e a Máquina Hipotética: toda a memória M[] é um único array double[] de 64 bits."],
+          ["De onde vem o ';' após a declaração?", "Da regra R2 (DC -> VAR MAIS_CMDS), pois MAIS_CMDS começa obrigatoriamente com ';' (; <CMDS>)."]
+        ]
+      },
+      {
+        id: 3,
+        cat: "GRAMATICA",
+        catName: "1. Gramática lalg-java.txt",
+        file: "lalg-java.txt",
+        lines: "Linhas 7 e 8 (Regras R8 a R12)",
+        codeTitle: "lalg-java.txt — O Segredo do Ponto-e-Vírgula em <CMDS>",
+        code: `R8:  CMDS      -> <CMD> <MAIS_CMDS>\nR9:  CMDS      -> <CMD_COND> <CMDS>\nR10: CMDS      -> <DC>\nR11: CMDS      -> λ\nR12: MAIS_CMDS -> ; <CMDS>`,
+        question: "3. Por que <CMD> é seguido por <MAIS_CMDS>, enquanto <CMD_COND> é seguido diretamente por <CMDS>?",
+        hint: "Olhe a regra R12: qual é o primeiro símbolo de MAIS_CMDS? E como terminam if e while em Java?",
+        keywords: ["MAIS_CMDS", "ponto-e-vírgula", "chaves", "if", "while"],
+        shortAnswer: "Porque comandos simples (<CMD>: atribuição e print) exigem ponto-e-vírgula ';' no final, que está em MAIS_CMDS (; <CMDS>). Já comandos condicionais e laços (<CMD_COND>: if e while) fecham com chave '}' e NÃO levam ';' após a chave em Java, por isso chamam <CMDS> direto!",
+        details: [
+          ["E para que serve R11 (CMDS -> λ)?", "Permite encerrar qualquer bloco de comandos '{ <CMDS> }' quando o parser encontra o fecha-chave '}' (inclusive permitindo blocos vazios '{ }')."],
+          ["E R10 (CMDS -> <DC>)?", "Permite declarar variáveis em qualquer posição dentro de um bloco (no início ou intercaladas com comandos)."]
+        ]
+      },
+      {
+        id: 4,
+        cat: "GRAMATICA",
+        catName: "1. Gramática lalg-java.txt",
+        file: "lalg-java.txt",
+        lines: "Linhas 9, 10 e 13 (Regras R13, R14, R17, R18)",
+        codeTitle: "lalg-java.txt — If, Else, While e Dangling Else",
+        code: `R13: CMD_COND -> if ( <CONDICAO> ) { <CMDS> } <PFALSA>\nR14: CMD_COND -> while ( <CONDICAO> ) { <CMDS> }\nR17: PFALSA   -> else { <CMDS> }\nR18: PFALSA   -> λ`,
+        question: "4. O que faz o não-terminal <PFALSA> e por que esta gramática NÃO tem o conflito clássico de 'Dangling Else'?",
+        hint: "Em C ou Java padrão, você pode fazer 'if (x > 0) if (y > 0) a = 1; else a = 2;' sem chaves. E aqui?",
+        keywords: ["chaves", "obrigatórias", "ambiguidade", "else", "vazio"],
+        shortAnswer: "<PFALSA> representa a parte falsa opcional do 'if' (pode ter 'else { <CMDS> }' pela R17 ou ser vazia λ pela R18). Não há conflito de Dangling Else porque as chaves '{ <CMDS> }' são OBRIGATÓRIAS tanto no 'if' quanto no 'else', delimitando com 100% de certeza onde cada bloco começa e termina.",
+        details: [
+          ["Como o parser decide no Estado 87 (após '}' do if)?", "Se o próximo token for 'else', faz SHIFT para o Estado 90; se for qualquer início de comando ou '}', aplica REDUCE R18 (PFALSA -> λ). Zero conflito!"]
+        ]
+      },
+      {
+        id: 5,
+        cat: "GRAMATICA",
+        catName: "1. Gramática lalg-java.txt",
+        file: "lalg-java.txt",
+        lines: "Linhas 11, 12, 14 e 15 (Regras R15, R16, R19, R20, R21)",
+        codeTitle: "lalg-java.txt — Comandos Simples e Restrição do lerDouble()",
+        code: `R15: CMD         -> System.out.println ( <EXPRESSAO> )\nR16: CMD         -> id <RESTO_IDENT>\nR19: RESTO_IDENT -> = <EXP_IDENT>\nR20: EXP_IDENT   -> <EXPRESSAO>\nR21: EXP_IDENT   -> lerDouble()`,
+        question: "5. PERGUNTA CLÁSSICA DO PROFESSOR: Por que 'lerDouble()' está em EXP_IDENT (R21) e não dentro de FATOR junto com números e variáveis?",
+        hint: "O que aconteceria se lerDouble() fosse um FATOR? Poderíamos escrever 'a = lerDouble() + 10;'?",
+        keywords: ["atribuição", "expressão", "proibir", "isolado", "FATOR"],
+        shortAnswer: "Porque a linguagem proíbe usar 'lerDouble()' no meio de expressões matemáticas ou condições (como 'a = lerDouble() + 5;' ou 'if (lerDouble() > 0)'). Colocando-o em EXP_IDENT, a leitura do teclado só é aceita isoladamente à direita de uma atribuição simples ('a = lerDouble();').",
+        details: [
+          ["Onde isso reflete na Tabela SLR?", "Apenas o Estado 31 (logo após ler 'id =') possui transição de SHIFT para o token LER_DOUBLE (indo para o Estado 47)."]
+        ]
+      },
+      {
+        id: 6,
+        cat: "GRAMATICA",
+        catName: "1. Gramática lalg-java.txt",
+        file: "lalg-java.txt",
+        lines: "Linhas 18 a 25 (Regras R29 a R43)",
+        codeTitle: "lalg-java.txt — Hierarquia de Expressões (3 Níveis)",
+        code: `R29: EXPRESSAO     -> <TERMO> <OUTROS_TERMOS>          // + e -\nR30: TERMO         -> <OP_UN> <FATOR> <MAIS_FATORES>   // unário -, * e /\nR31: OP_UN         -> -   |   R32: OP_UN -> λ\nR33: FATOR         -> id  |   R34: numero_real  |  R35: ( <EXPRESSAO> )`,
+        question: "6. Por que a gramática divide as expressões aritméticas em 3 níveis (EXPRESSAO, TERMO e FATOR) em vez de uma regra única?",
+        hint: "Em '2 + 3 * 4', quem deve ser calculado primeiro na árvore sintática?",
+        keywords: ["precedência", "prioridade", "multiplicação", "soma", "unário"],
+        shortAnswer: "Para garantir a precedência matemática correta na árvore sintática sem ambiguidade: FATOR (parênteses, números, variáveis) fica no nível mais profundo e tem maior prioridade; TERMO (*, / e sinal unário -) tem prioridade intermediária; e EXPRESSAO (+ e -) fica no topo e é calculada por último.",
+        details: [
+          ["E o que faz OP_UN (R31 e R32)?", "Trata o sinal negativo unário antes de um fator (ex: '-10' ou '-x'), gerando a instrução INVE na Máquina Hipotética."],
+          ["Por que usa OUTROS_TERMOS e MAIS_FATORES?", "Usa recursão à direita com λ para evitar conflitos e manter a tabela SLR(1) livre de ambiguidades."]
+        ]
+      },
+
+      // ---------------- 2. LEXER.JAVA (6) ----------------
+      {
+        id: 7,
+        cat: "LEXER",
+        catName: "2. Analisador Léxico (Lexer.java)",
+        file: "src/compilador/Lexer.java",
+        lines: "Linhas 21 a 64",
+        codeTitle: "Lexer.java — enum Tipo e class Token",
+        code: `public enum Tipo {\n    PUBLIC, CLASS, STATIC, VOID, MAIN, STRING, DOUBLE, IF, ELSE, WHILE,\n    PRINT, LER_DOUBLE, ID, NUMERO_REAL,\n    ABRE_PAR, FECHA_PAR, ABRE_CHAVE, FECHA_CHAVE, ABRE_COLCH, FECHA_COLCH,\n    PONTO_VIRG, VIRGULA, ATRIB, EQ, NE, GE, LE, GT, LT,\n    MAIS, MENOS, MULT, DIV, EOF\n}\npublic static class Token {\n    public final Tipo tipo;\n    public final String lexema;\n    public final int linha, coluna;\n}`,
+        question: "7. Qual a diferença entre 'tipo' e 'lexema' dentro de um Token, e por que guardamos 'linha' e 'coluna'?",
+        hint: "Pense no token da variável 'cont' na linha 3: qual é o Tipo dele e qual é o lexema dele?",
+        keywords: ["categoria", "texto", "ID", "erro", "linha"],
+        shortAnswer: "'tipo' é a categoria gramatical do token usada pelo Parser SLR (ex: Tipo.ID ou Tipo.NUMERO_REAL), enquanto 'lexema' é o texto exato lido do código-fonte (ex: \"cont\" ou \"10\"). Guardamos 'linha' e 'coluna' para reportar a posição exata de erros sintáticos ou semânticos.",
+        details: [
+          ["Quantos tipos existem no enum Tipo?", "São 33 terminais da gramática lalg-java mais o marcador EOF ('$'), totalizando 34 constantes."]
+        ]
+      },
+      {
+        id: 8,
+        cat: "LEXER",
+        catName: "2. Analisador Léxico (Lexer.java)",
+        file: "src/compilador/Lexer.java",
+        lines: "Linhas 80 a 91 e 155",
+        codeTitle: "Lexer.java — Dicionário de Palavras Reservadas",
+        code: `private static final Map<String, Tipo> PALAVRAS_RESERVADAS = Map.of(\n    "public", Tipo.PUBLIC, "class",  Tipo.CLASS,  "static", Tipo.STATIC,\n    "void",   Tipo.VOID,   "main",   Tipo.MAIN,   "String", Tipo.STRING,\n    "double", Tipo.DOUBLE, "if",     Tipo.IF,     "else",   Tipo.ELSE,\n    "while",  Tipo.WHILE\n);\n// ...\nTipo tipo = PALAVRAS_RESERVADAS.getOrDefault(palavra, Tipo.ID);\nreturn new Token(tipo, palavra, linhaToken, colunaToken);`,
+        question: "8. O que faz 'PALAVRAS_RESERVADAS.getOrDefault(palavra, Tipo.ID)' na linha 155?",
+        hint: "O que esse método retorna se 'palavra' for \"while\"? E se for \"cont\"?",
+        keywords: ["reservada", "identificador", "ID", "mapa", "O(1)"],
+        shortAnswer: "Consulta em tempo O(1) se a palavra lida é uma das 10 palavras reservadas da linguagem. Se estiver no mapa (ex: \"while\" ou \"double\"), retorna o Tipo correspondente (Tipo.WHILE, Tipo.DOUBLE); caso contrário, assume que é o nome de uma variável/classe e retorna Tipo.ID.",
+        details: [
+          ["Por que 'String' está com S maiúsculo no mapa?", "Porque em Java a classe 'String' no cabeçalho 'public static void main(String[] args)' é case-sensitive e começa com letra maiúscula."]
+        ]
+      },
+      {
+        id: 9,
+        cat: "LEXER",
+        catName: "2. Analisador Léxico (Lexer.java)",
+        file: "src/compilador/Lexer.java",
+        lines: "Linhas 102 a 117",
+        codeTitle: "Lexer.java — fromFile() e tokenizarTodos()",
+        code: `public static Lexer fromFile(String caminhoArquivo) throws IOException {\n    return new Lexer(Files.readString(Path.of(caminhoArquivo), StandardCharsets.UTF_8));\n}\n\npublic List<Token> tokenizarTodos() {\n    List<Token> listaDeTokens = new ArrayList<>();\n    Token token;\n    do {\n        token = proximoToken();\n        listaDeTokens.add(token);\n    } while (token.tipo != Tipo.EOF);\n    return listaDeTokens;\n}`,
+        question: "9. Por que usamos 'StandardCharsets.UTF_8' no fromFile() e por que 'tokenizarTodos()' usa um laço 'do-while' até 'Tipo.EOF'?",
+        hint: "O token EOF ('$') precisa ser incluído no final da listaDeTokens para o Parser SLR funcionar?",
+        keywords: ["UTF-8", "EOF", "cifrão", "ACCEPT", "lista"],
+        shortAnswer: "O 'UTF-8' garante leitura padronizada em qualquer sistema operacional. E o 'do-while' garante que o token final Tipo.EOF ('$') seja adicionado ao fim da lista antes de encerrar o laço — pois o Parser SLR(1) precisa ler o token EOF no Estado 2 para disparar a ação ACCEPT!",
+        details: [
+          ["O que aconteceria se EOF não entrasse na lista?", "O Parser SLR chegaria ao fim dos tokens sem encontrar '$' para dar ACCEPT e sofreria IndexOutOfBoundsException."]
+        ]
+      },
+      {
+        id: 10,
+        cat: "LEXER",
+        catName: "2. Analisador Léxico (Lexer.java)",
+        file: "src/compilador/Lexer.java",
+        lines: "Linhas 134 a 152",
+        codeTitle: "Lexer.java — Reconhecimento de Palavras, System.out.println e lerDouble()",
+        code: `if (Character.isLetter(caractere) || caractere == '_') {\n    int inicio = posicaoAtual - 1;\n    while (posicaoAtual < codigoFonte.length() &&\n           (Character.isLetterOrDigit(codigoFonte.charAt(posicaoAtual)) || codigoFonte.charAt(posicaoAtual) == '_')) {\n        lerProximoCaractere();\n    }\n    String palavra = codigoFonte.substring(inicio, posicaoAtual);\n\n    if ("System".equals(palavra) && codigoFonte.startsWith(".out.println", posicaoAtual)) {\n        for (int i = 0; i < ".out.println".length(); i++) lerProximoCaractere();\n        return new Token(Tipo.PRINT, "System.out.println", linhaToken, colunaToken);\n    }\n    if ("lerDouble".equals(palavra) && codigoFonte.startsWith("()", posicaoAtual)) {\n        lerProximoCaractere();\n        lerProximoCaractere();\n        return new Token(Tipo.LER_DOUBLE, "lerDouble()", linhaToken, colunaToken);\n    }`,
+        question: "10. Por que o Lexer verifica 'startsWith(\".out.println\")' e consome num laço 'for', e faz o mesmo para 'lerDouble()'?",
+        hint: "Existe o operador ponto '.' na gramática lalg-java? E por que chamar lerProximoCaractere() 12 vezes em vez de somar posicaoAtual += 12?",
+        keywords: ["terminal único", "PRINT", "LER_DOUBLE", "colunaAtual", "ponto"],
+        shortAnswer: "Porque na gramática lalg-java 'System.out.println' e 'lerDouble()' são símbolos terminais atômicos (a linguagem não possui objetos nem operador ponto '.'). Usamos 'lerProximoCaractere()' para consumir os caracteres extras mantendo 'colunaAtual' perfeitamente sincronizada!",
+        details: [
+          ["Por que 'int inicio = posicaoAtual - 1'?", "Porque o 1º caractere da palavra já foi consumido na linha 131 ('char caractere = lerProximoCaractere()'), então o índice inicial da palavra é posicaoAtual - 1."]
+        ]
+      },
+      {
+        id: 11,
+        cat: "LEXER",
+        catName: "2. Analisador Léxico (Lexer.java)",
+        file: "src/compilador/Lexer.java",
+        lines: "Linhas 160 a 175",
+        codeTitle: "Lexer.java — Reconhecimento de Números (NUMERO_REAL)",
+        code: `if (Character.isDigit(caractere)) {\n    int inicio = posicaoAtual - 1;\n    while (posicaoAtual < codigoFonte.length() && Character.isDigit(codigoFonte.charAt(posicaoAtual))) {\n        lerProximoCaractere();\n    }\n    // Parte decimal opcional após o ponto '.'\n    if (posicaoAtual + 1 < codigoFonte.length() &&\n        codigoFonte.charAt(posicaoAtual) == '.' &&\n        Character.isDigit(codigoFonte.charAt(posicaoAtual + 1))) {\n        lerProximoCaractere(); // Consome '.'\n        while (posicaoAtual < codigoFonte.length() && Character.isDigit(codigoFonte.charAt(posicaoAtual))) {\n            lerProximoCaractere();\n        }\n    }\n    return new Token(Tipo.NUMERO_REAL, codigoFonte.substring(inicio, posicaoAtual), linhaToken, colunaToken);\n}`,
+        question: "11. Como esse trecho lê números inteiros (ex: 10) e reais (ex: 3.14), e por que ele olha 'posicaoAtual + 1' antes de consumir o ponto '.'?",
+        hint: "E se alguém escrever '10.' sem dígito depois do ponto?",
+        keywords: ["inteiro", "decimal", "ponto", "dígito", "NUMERO_REAL"],
+        shortAnswer: "O 1º while consome todos os dígitos da parte inteira. Depois, o 'if' verifica se há um ponto '.' seguido obrigatoriamente de pelo menos um dígito ('posicaoAtual + 1'). Se houver, consome o '.' e os dígitos decimais. Tanto inteiros ('10') quanto decimais ('3.14') viram Tipo.NUMERO_REAL.",
+        details: [
+          ["O que acontece se o código tiver '10.a'?", "Como após o '.' não há dígito, ele fecha o número '10' e na próxima chamada o '.' dispara LexicalException ('Caractere invalido: .')."]
+        ]
+      },
+      {
+        id: 12,
+        cat: "LEXER",
+        catName: "2. Analisador Léxico (Lexer.java)",
+        file: "src/compilador/Lexer.java",
+        lines: "Linhas 191 a 252",
+        codeTitle: "Lexer.java — Operadores Compostos e Comentários",
+        code: `case '=': return consumirSeProximoFor('=')\n        ? new Token(Tipo.EQ, "==", linhaToken, colunaToken)\n        : new Token(Tipo.ATRIB, "=", linhaToken, colunaToken);\ncase '!':\n    if (consumirSeProximoFor('=')) return new Token(Tipo.NE, "!=", linhaToken, colunaToken);\n    throw new LexicalException("Esperado '=' apos '!'", linhaToken, colunaToken);\n// ...\nprivate boolean consumirSeProximoFor(char esperado) {\n    if (posicaoAtual >= codigoFonte.length() || codigoFonte.charAt(posicaoAtual) != esperado) return false;\n    lerProximoCaractere();\n    return true;\n}`,
+        question: "12. O que faz o método 'consumirSeProximoFor(char esperado)' e por que o 'case !' lança exceção se ele retornar false?",
+        hint: "Existe o operador lógico de negação '!' sozinho na gramática lalg-java?",
+        keywords: ["lookahead", "igualdade", "atribuição", "diferente", "LexicalException"],
+        shortAnswer: "É um lookahead condicional de 1 caractere: se o próximo caractere for o esperado (ex: segundo '=' em '=='), consome-o e retorna true; senão, não avança o ponteiro e retorna false. No 'case !', como a linguagem não tem operador '!' isolado (apenas '!='), se não vier '=' após '!', lança LexicalException.",
+        details: [
+          ["Como pularEspacosEComentarios() trata '/* ... */'?", "Se abrir '/*' e chegar ao fim do arquivo sem encontrar '*/', lança LexicalException informando a linha e coluna onde o comentário foi aberto."]
+        ]
+      },
+
+      // ---------------- 3. TABELASLR.JAVA (6) ----------------
+      {
+        id: 13,
+        cat: "TABELASLR",
+        catName: "3. Tabela Sintática (TabelaSLR.java)",
+        file: "src/compilador/TabelaSLR.java",
+        lines: "Linhas 20 a 44",
+        codeTitle: "TabelaSLR.java — Classes Regra e Acao",
+        code: `public static class Regra {\n    public final int numeroRegra;\n    public final ParserSLR.NaoTerminal ladoEsquerdo;\n    public final Object[] ladoDireito;\n\n    public Regra(int numeroRegra, ParserSLR.NaoTerminal ladoEsquerdo, Object... ladoDireito) {\n        this.numeroRegra = numeroRegra;\n        this.ladoEsquerdo = ladoEsquerdo;\n        this.ladoDireito = ladoDireito;\n    }\n}\npublic enum AcaoTipo { SHIFT, REDUCE, ACCEPT, ERROR }`,
+        question: "13. Na classe Regra, o que são 'ladoEsquerdo' e 'ladoDireito', por que 'ladoDireito' é 'Object[]', e como é representada uma regra vazia (λ)?",
+        hint: "Em 'CMD -> id RESTO_IDENT', quem está antes da seta e quem está depois da seta?",
+        keywords: ["LHS", "RHS", "varargs", "vazio", "length"],
+        shortAnswer: "'ladoEsquerdo' é o Não-Terminal antes da seta (->) e 'ladoDireito' é o array de símbolos após a seta. Ele é Object[] porque mistura Terminais (Lexer.Tipo) e Não-Terminais (NaoTerminal). Quando a regra é vazia (λ), 'ladoDireito' é um array vazio de tamanho 0 (ladoDireito.length == 0).",
+        details: [
+          ["Por que isso facilita o REDUCE no ParserSLR?", "Porque o ParserSLR só precisa ler 'regra.ladoDireito.length' para saber quantos itens desempilhar (0 itens em regras vazias) e 'regra.ladoEsquerdo' para consultar o GOTO!"]
+        ]
+      },
+      {
+        id: 14,
+        cat: "TABELASLR",
+        catName: "3. Tabela Sintática (TabelaSLR.java)",
+        file: "src/compilador/TabelaSLR.java",
+        lines: "Linhas 58 a 73",
+        codeTitle: "TabelaSLR.java — Consultas ACTION, GOTO e Tokens Esperados",
+        code: `public Acao obterAcao(int estadoAtual, Lexer.Tipo tipoDoToken) {\n    Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estadoAtual);\n    return (linha != null && linha.containsKey(tipoDoToken))\n            ? linha.get(tipoDoToken)\n            : new Acao(AcaoTipo.ERROR, 0, null);\n}\npublic Integer obterGoto(int estadoAtual, ParserSLR.NaoTerminal naoTerminal) {\n    Map<ParserSLR.NaoTerminal, Integer> linha = tabelaGoto.get(estadoAtual);\n    return (linha != null) ? linha.get(naoTerminal) : null;\n}\npublic Set<Lexer.Tipo> obterTokensEsperados(int estadoAtual) {\n    Map<Lexer.Tipo, Acao> linha = tabelaAction.get(estadoAtual);\n    return (linha != null) ? linha.keySet() : Collections.emptySet();\n}`,
+        question: "14. O que fazem esses 3 métodos e como 'obterTokensEsperados(estadoAtual)' consegue dizer exatamente o que faltou no erro sintático?",
+        hint: "O que representam as chaves (keySet) do mapa tabelaAction naquele estado?",
+        keywords: ["ACTION", "GOTO", "ERROR", "keySet", "colunas"],
+        shortAnswer: "'obterAcao' consulta ACTION[estado, token] (retornando ERROR se a célula estiver vazia) e 'obterGoto' consulta GOTO[estado, naoTerminal] após uma redução. Já 'obterTokensEsperados' retorna 'linha.keySet()', que são todas as colunas de tokens que possuem alguma ação válida (SHIFT/REDUCE/ACCEPT) naquele estado!",
+        details: [
+          ["Exemplo real em erro_sintatico.java.txt:", "Em 'if a > 5', o parser está no Estado 18 (após ler 'if'). A única chave em tabelaAction.get(18) é ABRE_PAR. Logo, keySet() retorna '[ABRE_PAR]'!"]
+        ]
+      },
+      {
+        id: 15,
+        cat: "TABELASLR",
+        catName: "3. Tabela Sintática (TabelaSLR.java)",
+        file: "src/compilador/TabelaSLR.java",
+        lines: "Linhas 107 a 113",
+        codeTitle: "TabelaSLR.java — O Método adicionarReduce (Coração do SLR(1))",
+        code: `// Regra do SLR(1): aplica REDUCE pela regra indicada para todos os tokens que pertencem a FOLLOW(ladoEsquerdo)\nprivate void adicionarReduce(int estadoAtual, int numeroDaRegra) {\n    Regra regra = regrasDaGramatica.get(numeroDaRegra);\n    for (Lexer.Tipo tokenDoFollow : conjuntoFollow.get(regra.ladoEsquerdo)) {\n        tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())\n                    .put(tokenDoFollow, new Acao(AcaoTipo.REDUCE, 0, regra));\n    }\n}`,
+        question: "15. ATENÇÃO MÁXIMA: O que este método faz e por que ele prova que o seu compilador é SLR(1) e não LR(0)?",
+        hint: "Em quais colunas da tabela ACTION o LR(0) coloca REDUCE? E em quais colunas o SLR(1) coloca?",
+        keywords: ["FOLLOW", "ladoEsquerdo", "SLR(1)", "LR(0)", "conflito"],
+        shortAnswer: "Quando um estado completa uma regra 'ladoEsquerdo -> ladoDireito', este método percorre apenas os tokens que pertencem ao conjunto FOLLOW(ladoEsquerdo) e cadastra a ação REDUCE somente nessas colunas! No LR(0), o reduce seria colocado em todas as colunas cegamente, gerando conflitos Shift/Reduce.",
+        details: [
+          ["Exemplo prático no Estado 16:", "No Estado 16 temos a regra vazia R11 (CMDS -> λ). Como FOLLOW(CMDS) = { '}' }, adicionarReduce(16, 11) coloca REDUCE apenas na coluna do '}', deixando 'double', 'if', 'while', 'id' e 'print' livres para fazer SHIFT!"]
+        ]
+      },
+      {
+        id: 16,
+        cat: "TABELASLR",
+        catName: "3. Tabela Sintática (TabelaSLR.java)",
+        file: "src/compilador/TabelaSLR.java",
+        lines: "Linhas 188 a 238",
+        codeTitle: "TabelaSLR.java — Conjuntos FIRST e FOLLOW",
+        code: `definirFirst(CMDS, DOUBLE, IF, WHILE, PRINT, ID);\ndefinirFirst(TERMO, ABRE_PAR, MENOS, NUMERO_REAL, ID);\n// ...\ndefinirFollow(PROG, EOF);\ndefinirFollow(CMDS, FECHA_CHAVE);\ndefinirFollow(CMD, PONTO_VIRG);\ndefinirFollow(CONDICAO, FECHA_PAR);`,
+        question: "16. O que significam FIRST(X) e FOLLOW(X), por que '(' está em FIRST(TERMO) se TERMO começa com OP_UN, e por que FOLLOW(CMDS) é só '}'?",
+        hint: "OP_UN pode ser vazio (λ)? E onde aparece <CMDS> na gramática?",
+        keywords: ["primeiro", "direita", "anulável", "FECHA_CHAVE", "PONTO_VIRG"],
+        shortAnswer: "FIRST(X) são os terminais que podem iniciar X; FOLLOW(X) são os terminais que podem vir imediatamente após X. '(' entra em FIRST(TERMO) porque TERMO começa com OP_UN, que pode ser vazio (λ), expondo o FIRST(FATOR). E FOLLOW(CMDS) é '{ FECHA_CHAVE }' porque todo bloco <CMDS> sempre termina fechado por '}'.",
+        details: [
+          ["Por que FOLLOW(CMD) é '{ PONTO_VIRG }'?", "Porque na regra R8 (CMDS -> CMD MAIS_CMDS), depois de CMD vem sempre MAIS_CMDS, cujo único símbolo inicial é ';'."]
+        ]
+      },
+      {
+        id: 17,
+        cat: "TABELASLR",
+        catName: "3. Tabela Sintática (TabelaSLR.java)",
+        file: "src/compilador/TabelaSLR.java",
+        lines: "Linhas 245 a 259 e 322 a 327",
+        codeTitle: "TabelaSLR.java — Os 6 Estados 'Hubs de Comandos'",
+        code: `private void configurarHubDeComandos(int estadoHub, int destinoCmds) {\n    adicionarShift(estadoHub, DOUBLE, 17);\n    adicionarShift(estadoHub, IF, 18);\n    adicionarShift(estadoHub, WHILE, 19);\n    adicionarShift(estadoHub, PRINT, 20);\n    adicionarShift(estadoHub, ID, 21);\n    adicionarReduce(estadoHub, 11); // R11: CMDS -> vazio (quando encontra '}')\n\n    adicionarGoto(estadoHub, CMDS, destinoCmds);\n    adicionarGoto(estadoHub, DC, 22);  adicionarGoto(estadoHub, VAR, 23);\n    adicionarGoto(estadoHub, TIPO, 24); adicionarGoto(estadoHub, CMD_COND, 26);\n    adicionarGoto(estadoHub, CMD, 27);\n}\n// Chamadas:\nconfigurarHubDeComandos(16, 25); // main { ... }\nconfigurarHubDeComandos(26, 38); // após if ou while\nconfigurarHubDeComandos(33, 50); // após ;\nconfigurarHubDeComandos(73, 82); // dentro do if { ... }\nconfigurarHubDeComandos(81, 86); // dentro do while { ... }\nconfigurarHubDeComandos(92, 93); // dentro do else { ... }`,
+        question: "17. Por que existem 6 estados (16, 26, 33, 73, 81 e 92) que usam esse mesmo método 'configurarHubDeComandos', e o que muda de um para o outro?",
+        hint: "Olhe para o segundo parâmetro 'int destinoCmds' nas 6 chamadas!",
+        keywords: ["contexto", "destinoCmds", "GOTO", "bloco", "CMDS"],
+        shortAnswer: "Cada um desses 6 estados lê uma sequência de comandos <CMDS>, mas em um contexto diferente do programa (16 no main, 26 após um bloco if/while, 33 após ';', 73 dentro do if, 81 dentro do while, 92 dentro do else). O que muda entre eles é o 'destinoCmds' na tabela GOTO, para que o parser saiba qual estrutura fechar quando o bloco terminar!",
+        details: [
+          ["Exemplo:", "Quando o <CMDS> termina dentro de um 'while' (Hub 81), o GOTO leva ao Estado 86 (que fecha o while com R14). Já quando termina no 'main' (Hub 16), o GOTO leva ao Estado 25 (que fecha o programa PROG)."]
+        ]
+      },
+      {
+        id: 18,
+        cat: "TABELASLR",
+        catName: "3. Tabela Sintática (TabelaSLR.java)",
+        file: "src/compilador/TabelaSLR.java",
+        lines: "Linhas 262 a 268, 340 e 373",
+        codeTitle: "TabelaSLR.java — Estados Decisores: Expressão, Vírgula (35) e Else (87)",
+        code: `private void configurarInicioExpressao(int estado, int destinoExpressao) {\n    adicionarShift(estado, MENOS, 40);\n    adicionarReduce(estado, 32); // R32: OP_UN -> vazio\n    adicionarGoto(estado, OP_UN, 44);\n    adicionarGoto(estado, TERMO, 43);\n    adicionarGoto(estado, EXPRESSAO, destinoExpressao);\n}\n// Estado 35 (Lista de variáveis):\nadicionarShift(35, VIRGULA, 51);  adicionarReduce(35, 6);  adicionarGoto(35, MAIS_VAR, 52);\n// Estado 87 (Logo após fechar '}' do if):\nadicionarShift(87, ELSE, 90);     adicionarReduce(87, 18); adicionarGoto(87, PFALSA, 91);`,
+        question: "18. O que decidem 'configurarInicioExpressao', o Estado 35 e o Estado 87?",
+        hint: "Em cada um deles, há um SHIFT para um token específico e um REDUCE de regra vazia (λ) para os demais!",
+        keywords: ["OP_UN", "vírgula", "ELSE", "PFALSA", "vazio"],
+        shortAnswer: "1) 'configurarInicioExpressao': se a expressão começar com '-', faz SHIFT 40 (OP_UN -> -); se começar com id, número ou '(', reduz R32 (OP_UN -> vazio) e vai ao 44 ler o FATOR. 2) Estado 35: se vier ',', faz SHIFT 51 para ler mais variáveis; se vier ';', reduz R6 (MAIS_VAR -> vazio). 3) Estado 87: após '}' do if, se vier 'else' faz SHIFT 90; senão, reduz R18 (PFALSA -> vazio).",
+        details: [
+          ["Padrão SLR(1) claro:", "Nos três casos, o token opcional ('-', ',' ou 'else') faz SHIFT e os tokens do FOLLOW fazem REDUCE da regra vazia λ!"]
+        ]
+      },
+
+      // ---------------- 4. PARSERSLR.JAVA (4) ----------------
+      {
+        id: 19,
+        cat: "PARSERSLR",
+        catName: "4. Motor Sintático (ParserSLR.java)",
+        file: "src/compilador/ParserSLR.java",
+        lines: "Linhas 47 a 60",
+        codeTitle: "ParserSLR.java — Estrutura do Nó da Árvore (NoSintatico)",
+        code: `public static class NoSintatico {\n    public final NaoTerminal naoTerminal;\n    public final Lexer.Token token;\n    public final List<NoSintatico> filhos = new ArrayList<>();\n\n    public NoSintatico(NaoTerminal naoTerminal) { this.naoTerminal = naoTerminal; this.token = null; }\n    public NoSintatico(Lexer.Token token)       { this.naoTerminal = null; this.token = token; }\n\n    public boolean ehFolha()             { return token != null; }\n    public Lexer.Tipo getTipoToken()     { return token != null ? token.tipo : null; }\n    public String getLexema()            { return token != null ? token.lexema : ""; }\n}`,
+        question: "19. Por que a classe 'NoSintatico' tem dois construtores diferentes e como diferenciamos uma folha de um nó interno?",
+        hint: "Quando fazemos SHIFT criamos que tipo de nó? E quando fazemos REDUCE?",
+        keywords: ["folha", "token", "naoTerminal", "SHIFT", "REDUCE"],
+        shortAnswer: "Porque na Árvore Sintática Concreta (CST) existem dois tipos de nós: 1) Nós Folha (criados no SHIFT), que guardam um 'Token' terminal lido do código e têm 'naoTerminal == null'; e 2) Nós Internos (criados no REDUCE), que guardam um 'NaoTerminal' da gramática, têm 'token == null' e possuem a lista de 'filhos'.",
+        details: [
+          ["Para que servem getTipoToken() e getLexema()?", "Evitam NullPointerException no Semântico e no Tradutor: se o nó for interno (token == null), retornam null ou string vazia \"\" com segurança."]
+        ]
+      },
+      {
+        id: 20,
+        cat: "PARSERSLR",
+        catName: "4. Motor Sintático (ParserSLR.java)",
+        file: "src/compilador/ParserSLR.java",
+        lines: "Linhas 90 a 109",
+        codeTitle: "ParserSLR.java — As Duas Pilhas Sincronizadas e o Laço Principal",
+        code: `public ResultadoParser analisar(List<Lexer.Token> tokens) {\n    if (modoDebug) tabela.imprimirFirstFollow();\n\n    Deque<Integer> pilhaDeEstados = new ArrayDeque<>();\n    Deque<NoSintatico> pilhaDeNos = new ArrayDeque<>();\n    pilhaDeEstados.push(0); // Começa no Estado 0\n\n    int indiceTokenAtual = 0, passos = 0, totalShifts = 0, totalReduces = 0;\n\n    while (true) {\n        passos++;\n        int estadoAtual = pilhaDeEstados.peek();\n        Lexer.Token tokenAtual = tokens.get(indiceTokenAtual);\n        TabelaSLR.Acao acao = tabela.obterAcao(estadoAtual, tokenAtual.tipo);`,
+        question: "20. Por que usamos duas pilhas separadas ('pilhaDeEstados' e 'pilhaDeNos'), por que 'pilhaDeEstados' começa com '0' e por que usamos 'peek()' na linha 101?",
+        hint: "Se usássemos 'pop()' na linha 101 em vez de 'peek()', o que aconteceria com o estado no topo?",
+        keywords: ["tipadas", "Estado 0", "peek", "topo", "sincronizadas"],
+        shortAnswer: "Separar 'pilhaDeEstados' (Integer) e 'pilhaDeNos' (NoSintatico) evita misturar números e nós em uma pilha genérica de Object (eliminando casts). Começamos com 'push(0)' porque 0 é o estado inicial do autômato LR. E usamos 'peek()' para apenas espiar o estado no topo sem removê-lo da pilha!",
+        details: [
+          ["Por que pilhaDeEstados tem sempre 1 elemento a mais que pilhaDeNos?", "Porque pilhaDeEstados já começa com o Estado 0 na base antes de qualquer símbolo ser empilhado!"]
+        ]
+      },
+      {
+        id: 21,
+        cat: "PARSERSLR",
+        catName: "4. Motor Sintático (ParserSLR.java)",
+        file: "src/compilador/ParserSLR.java",
+        lines: "Linhas 110 a 117",
+        codeTitle: "ParserSLR.java — A Ação de Deslocamento (case SHIFT)",
+        code: `case SHIFT:\n    // Empilha o token lido, avança para o novo estado e passa para o próximo token\n    totalShifts++;\n    pilhaDeNos.push(new NoSintatico(tokenAtual));\n    pilhaDeEstados.push(acao.estadoDestino);\n    indiceTokenAtual++;\n    break;`,
+        question: "21. O que fazem exatamente as 3 operações dentro do 'case SHIFT'?",
+        hint: "O que vai para pilhaDeNos, o que vai para pilhaDeEstados e o que acontece com a fita de entrada?",
+        keywords: ["folha", "estadoDestino", "indiceTokenAtual", "consome", "empilha"],
+        shortAnswer: "1) Cria um nó folha com o 'tokenAtual' e empilha em 'pilhaDeNos'; 2) Empilha o novo estado ('acao.estadoDestino') em 'pilhaDeEstados'; 3) Incrementa 'indiceTokenAtual++' para consumir o token da entrada e avançar o ponteiro para o próximo token.",
+        details: [
+          ["No REDUCE o indiceTokenAtual++ também acontece?", "NÃO! Apenas o SHIFT consome token da entrada. No REDUCE, o tokenAtual continua o mesmo (ele foi apenas o lookahead usado para decidir a redução)."]
+        ]
+      },
+      {
+        id: 22,
+        cat: "PARSERSLR",
+        catName: "4. Motor Sintático (ParserSLR.java)",
+        file: "src/compilador/ParserSLR.java",
+        lines: "Linhas 119 a 138",
+        codeTitle: "ParserSLR.java — A Ação de Redução (case REDUCE) e Aceitação (ACCEPT)",
+        code: `case REDUCE:\n    totalReduces++;\n    TabelaSLR.Regra regra = acao.regraParaReduzir;\n    NoSintatico novoNoPai = new NoSintatico(regra.ladoEsquerdo);\n\n    for (int k = 0; k < regra.ladoDireito.length; k++) {\n        pilhaDeEstados.pop();\n        novoNoPai.filhos.add(0, pilhaDeNos.pop());\n    }\n\n    int proximoEstado = tabela.obterGoto(pilhaDeEstados.peek(), regra.ladoEsquerdo);\n    pilhaDeNos.push(novoNoPai);\n    pilhaDeEstados.push(proximoEstado);\n    break;\n\ncase ACCEPT:\n    return new ResultadoParser(pilhaDeNos.pop(), passos, totalShifts, totalReduces);`,
+        question: "22. PERGUNTA DE OURO DA BANCA: Explique por que o 'for' desempilha 'regra.ladoDireito.length' vezes, por que usa 'add(0, ...)' e como calcula 'proximoEstado'!",
+        hint: "Em qual ordem os filhos saem do pop() da pilha? E quem fica exposto no topo de pilhaDeEstados depois do for?",
+        keywords: ["ladoDireito.length", "LIFO", "índice 0", "GOTO", "ladoEsquerdo"],
+        shortAnswer: "Desempilha 'ladoDireito.length' vezes porque para cada símbolo do lado direito da regra empilhado em 'pilhaDeNos' há um estado correspondente em 'pilhaDeEstados'. Usa 'add(0, ...)' porque a pilha é LIFO (desempilha da direita para a esquerda), então inserir sempre no início (índice 0) reconstrói a ordem esquerda -> direita! Depois, consulta GOTO usando o estado que ficou exposto no topo de 'pilhaDeEstados' e o 'ladoEsquerdo' da regra.",
+        details: [
+          ["E se a regra for vazia (λ), como R11 (CMDS -> λ)?", "Em regras vazias, 'regra.ladoDireito.length' é 0. O laço 'for' não executa (desempilha 0 itens), cria o nó vazio 'novoNoPai' e transita pelo GOTO normalmente!"]
+        ]
+      },
+
+      // ---------------- 5. ANALISADORSEMANTICO.JAVA (4) ----------------
+      {
+        id: 23,
+        cat: "SEMANTICO",
+        catName: "5. Analisador Semântico (AnalisadorSemantico.java)",
+        file: "src/compilador/AnalisadorSemantico.java",
+        lines: "Linhas 40 a 54",
+        codeTitle: "AnalisadorSemantico.java — Tabela de Símbolos e Inserção",
+        code: `public static class TabelaSimbolos {\n    private final Map<String, Simbolo> variaveisDeclaradas = new LinkedHashMap<>();\n\n    public Simbolo inserir(Lexer.Token tokenVariavel) {\n        String nome = tokenVariavel.lexema;\n        if (variaveisDeclaradas.containsKey(nome)) {\n            Simbolo anterior = variaveisDeclaradas.get(nome);\n            throw new SemanticException(\n                    String.format("Variavel '%s' ja declarada anteriormente na linha %d", nome, anterior.linha),\n                    tokenVariavel.linha, tokenVariavel.coluna);\n        }\n        Simbolo novo = new Simbolo(nome, "double", variaveisDeclaradas.size(), tokenVariavel.linha, tokenVariavel.coluna);\n        variaveisDeclaradas.put(nome, novo);\n        return novo;\n    }`,
+        question: "23. Por que usamos 'LinkedHashMap' em 'variaveisDeclaradas' e por que o endereço passado para 'new Simbolo' é 'variaveisDeclaradas.size()'?",
+        hint: "Quando a 1ª variável ('cont') é inserida, qual é o size() do mapa antes do put()? E na 2ª ('a')?",
+        keywords: ["LinkedHashMap", "ordem", "size()", "endereço", "duplicada"],
+        shortAnswer: "O 'LinkedHashMap' preserva a ordem exata em que as variáveis foram declaradas no programa. Ao usar 'variaveisDeclaradas.size()' antes do 'put', a 1ª variável recebe o endereço 0, a 2ª recebe 1, a 3ª recebe 2 e assim por diante, mapeando diretamente para as posições M[0], M[1], M[2]... da Máquina Hipotética! E se o nome já existir no mapa, barra com erro de variável duplicada.",
+        details: [
+          ["Como ficam os endereços em correto.java.txt?", "cont -> 0, a -> 1, b -> 2, c -> 3 (total de 4 variáveis)."]
+        ]
+      },
+      {
+        id: 24,
+        cat: "SEMANTICO",
+        catName: "5. Analisador Semântico (AnalisadorSemantico.java)",
+        file: "src/compilador/AnalisadorSemantico.java",
+        lines: "Linhas 56 a 71",
+        codeTitle: "AnalisadorSemantico.java — Verificação e Consultas de Endereço",
+        code: `public void verificarDeclarada(Lexer.Token tokenVariavel) {\n    String nome = tokenVariavel.lexema;\n    if (!variaveisDeclaradas.containsKey(nome)) {\n        throw new SemanticException(\n                String.format("Variavel '%s' utilizada sem declaracao previa", nome),\n                tokenVariavel.linha, tokenVariavel.coluna);\n    }\n}\npublic int obterEndereco(String nomeVariavel) {\n    return variaveisDeclaradas.get(nomeVariavel).endereco;\n}\npublic int getTotalVariaveis() {\n    return variaveisDeclaradas.size();\n}`,
+        question: "24. Onde e para que os métodos 'verificarDeclarada', 'obterEndereco' e 'getTotalVariaveis' são usados no compilador?",
+        hint: "Quais instruções da Máquina Hipotética precisam do endereço de uma variável e quais precisam do total de variáveis?",
+        keywords: ["declaração prévia", "CRVL", "ARMZ", "ALME", "DESM"],
+        shortAnswer: "'verificarDeclarada' é usado na análise semântica sempre que uma variável aparece em uma atribuição, conta ou condição para garantir que já foi declarada. Já 'obterEndereco' e 'getTotalVariaveis' são usados pelo TradutorCodigo: 'getTotalVariaveis' define o tamanho de 'ALME n' e 'DESM n', e 'obterEndereco' fornece o índice para 'CRVL end' e 'ARMZ end'.",
+        details: [
+          ["Por que obterEndereco() nunca dá NullPointerException no TradutorCodigo?", "Porque a Fase 4 (TradutorCodigo) só roda depois que a Fase 3 (AnalisadorSemantico) já validou com verificarDeclarada() que todas as variáveis existem na tabela!"]
+        ]
+      },
+      {
+        id: 25,
+        cat: "SEMANTICO",
+        catName: "5. Analisador Semântico (AnalisadorSemantico.java)",
+        file: "src/compilador/AnalisadorSemantico.java",
+        lines: "Linhas 90 a 94",
+        codeTitle: "AnalisadorSemantico.java — Por que getFilho(15)?",
+        code: `public TabelaSimbolos analisar(ParserSLR.NoSintatico noRaizProg) {\n    // O filho 15 de PROG é o bloco <CMDS> dentro do método main\n    percorrerComandos(noRaizProg.getFilho(15));\n    return tabela;\n}`,
+        question: "25. O que aconteceria se chamássemos 'percorrerComandos(noRaizProg)' na raiz inteira em vez de 'noRaizProg.getFilho(15)'?",
+        hint: "Quais tokens ID existem no cabeçalho de PROG antes do filho 15 ('public class Teste { public static void main(String[] args) {')?",
+        keywords: ["filho 15", "CMDS", "Teste", "args", "cabeçalho"],
+        shortAnswer: "No cabeçalho de PROG (filhos 0 a 14) existem dois tokens ID que NÃO são variáveis locais: o nome da classe (filho 2, ex: 'Teste') e o nome do parâmetro do main (filho 12, ex: 'args'). Se percorresse desde a raiz, o analisador acharia que 'Teste' e 'args' são variáveis usadas sem declaração! Começando no filho 15 (<CMDS>), analisamos apenas o corpo do método main.",
+        details: [
+          ["Contagem exata dos filhos de PROG:", "0:public, 1:class, 2:id, 3:{, 4:public, 5:static, 6:void, 7:main, 8:(, 9:String, 10:[, 11:], 12:id, 13:), 14:{, 15:<CMDS>, 16:}, 17:}."]
+        ]
+      },
+      {
+        id: 26,
+        cat: "SEMANTICO",
+        catName: "5. Analisador Semântico (AnalisadorSemantico.java)",
+        file: "src/compilador/AnalisadorSemantico.java",
+        lines: "Linhas 101 a 132",
+        codeTitle: "AnalisadorSemantico.java — Travessia de Declarações vs Uso",
+        code: `private void percorrerComandos(ParserSLR.NoSintatico no) {\n    if (no == null) return;\n\n    // 1. Declaração de variáveis (VAR -> TIPO VARS)\n    if (no.naoTerminal == ParserSLR.NaoTerminal.VAR) {\n        cadastrarVariaveis(no);\n        return;\n    }\n    // 2. Uso de variável (seja recebendo '=' ou dentro de uma conta/condição)\n    if (no.getTipoToken() == Lexer.Tipo.ID) {\n        tabela.verificarDeclarada(no.token);\n        return;\n    }\n    for (ParserSLR.NoSintatico filho : no.filhos) {\n        percorrerComandos(filho);\n    }\n}\nprivate void cadastrarVariaveis(ParserSLR.NoSintatico no) {\n    if (no == null) return;\n    if (no.getTipoToken() == Lexer.Tipo.ID) tabela.inserir(no.token);\n    for (ParserSLR.NoSintatico filho : no.filhos) cadastrarVariaveis(filho);\n}`,
+        question: "26. Como 'percorrerComandos' sabe se um token ID está sendo DECLARADO (deve inserir na tabela) ou USADO (deve verificar se já existe)?",
+        hint: "Repare no 'if (no.naoTerminal == NaoTerminal.VAR)' e no 'return;' logo abaixo de 'cadastrarVariaveis(no);'!",
+        keywords: ["VAR", "cadastrarVariaveis", "verificarDeclarada", "pré-ordem", "return"],
+        shortAnswer: "Ao percorrer a árvore de cima para baixo (pré-ordem), toda declaração de variáveis está dentro de uma subárvore 'NaoTerminal.VAR'. Quando encontra um nó VAR, ele desvia para 'cadastrarVariaveis(no)' (que insere todos os IDs daquela linha na tabela) e dá 'return'. Assim, qualquer outro token ID encontrado por 'percorrerComandos' fora de VAR é obrigatoriamente um USO de variável, caindo em 'verificarDeclarada'!",
+        details: [
+          ["E se alguém usar uma variável na linha 3 e só declará-la na linha 6?", "Como a travessia é em pré-ordem (na ordem das linhas do código), ao visitar a linha 3 a variável ainda não estará na tabela e 'verificarDeclarada' lançará SemanticException!"]
+        ]
+      },
+
+      // ---------------- 6. TRADUTORCODIGO.JAVA (5) ----------------
+      {
+        id: 27,
+        cat: "TRADUTOR",
+        catName: "6. Tradutor de Código (TradutorCodigo.java)",
+        file: "src/compilador/TradutorCodigo.java",
+        lines: "Linhas 17 a 56",
+        codeTitle: "TradutorCodigo.java — Instrucao, emitir() e corrigirDesvio()",
+        code: `public static class Instrucao {\n    public final String operacao;\n    public Double argumento;\n    @Override\n    public String toString() {\n        if (argumento == null) return operacao;\n        if (argumento == argumento.longValue()) return operacao + " " + argumento.longValue();\n        return operacao + " " + argumento;\n    }\n}\npublic int emitir(String operacao, double argumento) {\n    listaInstrucoes.add(new Instrucao(operacao, argumento));\n    return listaInstrucoes.size() - 1;\n}\npublic void corrigirDesvio(int linhaSalto, int linhaDestino) {\n    listaInstrucoes.get(linhaSalto).argumento = (double) linhaDestino;\n}`,
+        question: "27. Por que 'emitir()' retorna 'listaInstrucoes.size() - 1' e por que 'argumento' na classe Instrucao não é 'final'?",
+        hint: "Pense no Backpatching: o que acontece com o argumento de um DSVF depois que o bloco termina?",
+        keywords: ["índice", "Backpatching", "corrigirDesvio", "longValue", "mutável"],
+        shortAnswer: "'emitir()' retorna 'listaInstrucoes.size() - 1' para devolver o número exato da linha (0-indexada) onde aquela instrução acabou de ser gravada. E 'argumento' não é 'final' porque no Backpatching emitimos o salto com argumento provisório (-1) e depois 'corrigirDesvio' altera 'argumento' para a linha de destino real!",
+        details: [
+          ["Para que serve 'if (argumento == argumento.longValue())' no toString()?", "Para imprimir endereços e constantes inteiras sem '.0' no arquivo texto (ex: 'ALME 4' e 'DSVF 32' em vez de 'ALME 4.0' e 'DSVF 32.0'), mantendo decimais quando existirem ('CRCT 3.14')."]
+        ]
+      },
+      {
+        id: 28,
+        cat: "TRADUTOR",
+        catName: "6. Tradutor de Código (TradutorCodigo.java)",
+        file: "src/compilador/TradutorCodigo.java",
+        lines: "Linhas 58 a 88",
+        codeTitle: "TradutorCodigo.java — Estrutura Geral da Tradução",
+        code: `public void traduzir(ParserSLR.NoSintatico noRaizProg) {\n    emitir("INPP");\n    int totalVars = tabelaSimbolos.getTotalVariaveis();\n    if (totalVars > 0) emitir("ALME", totalVars);\n\n    traduzirBlocoComandos(noRaizProg);\n\n    if (totalVars > 0) emitir("DESM", totalVars);\n    emitir("PARA");\n}\nprivate void traduzirBlocoComandos(ParserSLR.NoSintatico no) {\n    if (no == null) return;\n    if (no.naoTerminal == ParserSLR.NaoTerminal.CMD)      { traduzirComandoSimples(no); return; }\n    if (no.naoTerminal == ParserSLR.NaoTerminal.CMD_COND) { traduzirComandoCondicionalOuLoop(no); return; }\n    for (ParserSLR.NoSintatico filho : no.filhos) traduzirBlocoComandos(filho);\n}`,
+        question: "28. Por que 'ALME' e 'DESM' são emitidos apenas uma vez no método 'traduzir()', e por que 'traduzirBlocoComandos' ignora nós 'DC / VAR'?",
+        hint: "Quantas variáveis existem em correto.java.txt? Onde o espaço delas já foi alocado?",
+        keywords: ["INPP", "ALME", "DESM", "PARA", "CMD"],
+        shortAnswer: "Porque a Tabela de Símbolos já contou todas as variáveis declaradas no programa ('totalVars = 4'). Assim, emitimos um único 'ALME 4' no início (logo após 'INPP') para reservar toda a memória de variáveis e um único 'DESM 4' no fim (antes de 'PARA'). Por isso, durante 'traduzirBlocoComandos', nós de declaração (DC/VAR) não precisam gerar nenhuma instrução extra — apenas CMD e CMD_COND geram código executável!",
+        details: [
+          ["Por que há 'return;' após chamar traduzirComandoSimples e traduzirComandoCondicionalOuLoop?", "Porque esses métodos já traduzem toda a subárvore daquele comando (incluindo os blocos internos de if/else/while); sem o 'return', o laço 'for' abaixo traduziria os filhos uma segunda vez!"]
+        ]
+      },
+      {
+        id: 29,
+        cat: "TRADUTOR",
+        catName: "6. Tradutor de Código (TradutorCodigo.java)",
+        file: "src/compilador/TradutorCodigo.java",
+        lines: "Linhas 93 a 111",
+        codeTitle: "TradutorCodigo.java — Tradução de Comandos Simples (Print, Atribuição, Leitura)",
+        code: `private void traduzirComandoSimples(ParserSLR.NoSintatico noCmd) {\n    // 1. Impressão: CMD -> System.out.println ( EXPRESSAO )\n    if (noCmd.getFilho(0).getTipoToken() == Lexer.Tipo.PRINT) {\n        traduzirExpressao(noCmd.getFilho(2));\n        emitir("IMPR");\n        return;\n    }\n    // 2. Atribuição: CMD -> id RESTO_IDENT (onde RESTO_IDENT -> = EXP_IDENT)\n    int enderecoVar = tabelaSimbolos.obterEndereco(noCmd.getFilho(0).getLexema());\n    ParserSLR.NoSintatico valorAtribuido = noCmd.getFilho(1).getFilho(1).getFilho(0);\n\n    if (valorAtribuido.getTipoToken() == Lexer.Tipo.LER_DOUBLE) {\n        emitir("LEIT");\n    } else {\n        traduzirExpressao(valorAtribuido);\n    }\n    emitir("ARMZ", enderecoVar);\n}`,
+        question: "29. Explique como esse método traduz 'System.out.println(c);', 'a = lerDouble();' e 'cont = 10;'!",
+        hint: "Qual instrução coloca o valor no topo da pilha em cada caso, e qual instrução consome esse topo?",
+        keywords: ["IMPR", "LEIT", "ARMZ", "enderecoVar", "pilha"],
+        shortAnswer: "1) No Print: avalia a EXPRESSAO (filho 2, deixando o resultado no topo da pilha) e emite 'IMPR'. 2) Na Atribuição: descobre o endereço da variável (filho 0) na Tabela de Símbolos. Se o lado direito for 'lerDouble()', emite 'LEIT' (que lê do teclado e empilha); se for uma expressão (ex: '10' ou 'a - b'), chama 'traduzirExpressao' (que calcula e deixa o resultado no topo). Por fim, emite 'ARMZ enderecoVar' para salvar o topo da pilha na variável!",
+        details: [
+          ["De onde vem 'noCmd.getFilho(1).getFilho(1).getFilho(0)'?", "Na árvore: noCmd é CMD -> id(0) RESTO_IDENT(1). Dentro de RESTO_IDENT -> =(0) EXP_IDENT(1). E dentro de EXP_IDENT -> filho(0), que é ou o token LER_DOUBLE ou o nó EXPRESSAO!"]
+        ]
+      },
+      {
+        id: 30,
+        cat: "TRADUTOR",
+        catName: "6. Tradutor de Código (TradutorCodigo.java)",
+        file: "src/compilador/TradutorCodigo.java",
+        lines: "Linhas 116 a 146",
+        codeTitle: "TradutorCodigo.java — Backpatching no If/Else e no While",
+        code: `if (tipo == Lexer.Tipo.IF) {\n    traduzirCondicao(noCondicao);\n    int linhaDsvf = emitir("DSVF", -1);\n    traduzirBlocoComandos(noCorpoPrincipal);\n\n    ParserSLR.NoSintatico noElse = noCmdCond.getFilho(7);\n    if (noElse.getQtdFilhos() >= 4) { // Tem bloco "else { CMDS }"\n        int linhaDsvi = emitir("DSVI", -1);\n        corrigirDesvio(linhaDsvf, listaInstrucoes.size());\n        traduzirBlocoComandos(noElse.getFilho(2));\n        corrigirDesvio(linhaDsvi, listaInstrucoes.size());\n    } else {\n        corrigirDesvio(linhaDsvf, listaInstrucoes.size());\n    }\n} else if (tipo == Lexer.Tipo.WHILE) {\n    int linhaInicioWhile = listaInstrucoes.size();\n    traduzirCondicao(noCondicao);\n    int linhaDsvf = emitir("DSVF", -1);\n    traduzirBlocoComandos(noCorpoPrincipal);\n    emitir("DSVI", linhaInicioWhile);\n    corrigirDesvio(linhaDsvf, listaInstrucoes.size());\n}`,
+        question: "30. PERGUNTA CLÁSSICA: No 'if com else', por que precisamos de DOIS desvios (DSVF e DSVI)? E no 'while', por que o DSVI não precisa de Backpatching (-1), mas o DSVF precisa?",
+        hint: "Se a condição do 'if' for verdadeira, o que aconteceria no fim do bloco 'if' se não existisse o DSVI antes do 'else'?",
+        keywords: ["DSVF", "DSVI", "pular o else", "linhaInicioWhile", "Backpatching"],
+        shortAnswer: "No 'if/else': o 'DSVF' fica no topo para pular para o início do 'else' se a condição for falsa; já o 'DSVI' fica no final do bloco 'if' para que, quando a condição for verdadeira, o programa pule o bloco 'else' e vá para depois dele! No 'while': o 'DSVI' salta para trás ('linhaInicioWhile', que já é conhecida desde o início do while), enquanto o 'DSVF' salta para frente (a linha após o fim do while, que só é conhecida depois de traduzir todo o laço).",
+        details: [
+          ["No correto.java.txt, quais linhas são geradas?", "No while: linhaInicioWhile = 4, DSVF 32 (na linha 7) e DSVI 4 (na linha 31). No if/else: DSVF 21 (na linha 15, aponta para o else) e DSVI 25 (na linha 20, pula o else)."]
+        ]
+      },
+      {
+        id: 31,
+        cat: "TRADUTOR",
+        catName: "6. Tradutor de Código (TradutorCodigo.java)",
+        file: "src/compilador/TradutorCodigo.java",
+        lines: "Linhas 170 a 211",
+        codeTitle: "TradutorCodigo.java — Expressões em Pilha, INVE, CRVL e CRCT",
+        code: `private void traduzirOutrosTermos(ParserSLR.NoSintatico noOutros) {\n    if (noOutros == null || noOutros.getQtdFilhos() == 0) return;\n    traduzirTermo(noOutros.getFilho(1));\n    Lexer.Tipo op = noOutros.getFilho(0).getFilho(0).getTipoToken();\n    emitir(op == Lexer.Tipo.MAIS ? "SOMA" : "SUBT");\n    traduzirOutrosTermos(noOutros.getFilho(2));\n}\nprivate void traduzirTermo(ParserSLR.NoSintatico noTermo) {\n    traduzirFator(noTermo.getFilho(1));\n    ParserSLR.NoSintatico noOpUn = noTermo.getFilho(0);\n    if (noOpUn.getQtdFilhos() > 0 && noOpUn.getFilho(0).getTipoToken() == Lexer.Tipo.MENOS) {\n        emitir("INVE");\n    }\n    traduzirMaisFatores(noTermo.getFilho(2));\n}`,
+        question: "31. Em 'traduzirTermo', por que traduzimos 'getFilho(1)' (FATOR) ANTES de olhar 'getFilho(0)' (OP_UN)? E em 'traduzirOutrosTermos', por que 'emitir(SOMA/SUBT)' vem ANTES da chamada recursiva?",
+        hint: "Para a instrução 'INVE' inverter o topo da pilha (M[s] = -M[s]), quem precisa já estar no topo da pilha?",
+        keywords: ["pós-fixa", "INVE", "FATOR", "associatividade", "esquerda"],
+        shortAnswer: "1) Porque em uma máquina de pilha (notação pós-fixa), a instrução 'INVE' inverte o valor que já está no topo M[s]; logo, precisamos empilhar o FATOR (filho 1) primeiro para depois emitir 'INVE'! 2) Em 'traduzirOutrosTermos', emitir SOMA/SUBT antes da chamada recursiva garante a associatividade à esquerda (em '10 - 3 - 2', calcula '10 - 3' primeiro e depois subtrai 2).",
+        details: [
+          ["Qual a diferença entre CRVL e CRCT em traduzirFator?", "Se o fator for variável (ID), emite 'CRVL endereco' (busca o valor na memória M[endereco]); se for número literal (NUMERO_REAL), emite 'CRCT valor' (empilha a constante direto)."]
+        ]
+      },
+
+      // ---------------- 7. MAQUINAHIPOTETICA.JAVA & CÓDIGO OBJETO (5) ----------------
+      {
+        id: 32,
+        cat: "MAQUINA",
+        catName: "7. Máquina Hipotética & Código Objeto",
+        file: "src/compilador/maquina/MaquinaHipotetica.java",
+        lines: "Linhas 36 a 40 e 73 a 77",
+        codeTitle: "MaquinaHipotetica.java — Registradores i, s, Memória M[] e Fetch",
+        code: `private final List<InstrucaoVM> programa = new ArrayList<>();\nprivate final double[] M = new double[10000];\nprivate int i = 0;  // Linha da próxima instrução\nprivate int s = -1; // Topo da pilha de dados M[]\n// ...\nwhile (rodando && i >= 0 && i < programa.size()) {\n    ciclo++;\n    int linhaAtual = i++; // Lê a linha atual e já avança 'i' para a próxima instrução\n    InstrucaoVM inst = programa.get(linhaAtual);`,
+        question: "32. O que são 'i', 's' e 'M[]', por que 's' começa em '-1' (e não em 0), e por que fazemos 'int linhaAtual = i++;' antes do switch?",
+        hint: "Se a pilha está vazia e M[] começa no índice 0, para onde 's' deve apontar antes do 1º empilhamento?",
+        keywords: ["Instruction Pointer", "Stack Pointer", "-1", "i++", "desvio"],
+        shortAnswer: "'i' é o apontador de instrução (Program Counter), 's' é o apontador do topo da pilha e 'M[]' é a memória unificada de variáveis e pilha de operandos. 's' começa em -1 porque o vetor M[] é 0-indexado: com a pilha vazia, não há topo válido; no 1º 's++', ele vai para M[0]. E 'linhaAtual = i++' avança o PC para a próxima linha por padrão; se a instrução for um salto (DSVI/DSVF), ela simplesmente sobrescreve 'i = argInt'.",
+        details: [
+          ["Por que o case INPP faz apenas 's = -1;' e não 'i = 0;'?", "Porque 'i' já foi iniciado em 0 antes do while e incrementado para 1 no 'i++' ao ler o INPP! Se INPP fizesse 'i = 0', a máquina voltaria para a linha 0 em loop infinito!"]
+        ]
+      },
+      {
+        id: 33,
+        cat: "MAQUINA",
+        catName: "7. Máquina Hipotética & Código Objeto",
+        file: "src/compilador/maquina/MaquinaHipotetica.java",
+        lines: "Linhas 86 a 95",
+        codeTitle: "MaquinaHipotetica.java — Alocação e Movimentação (ALME, DESM, CRCT, CRVL, ARMZ)",
+        code: `case "INPP": s = -1; break;\ncase "ALME": s += argInt; break;\ncase "DESM": s -= argInt; break;\ncase "PARA": rodando = false; break;\n\ncase "CRCT": s++; M[s] = inst.argumento; break;\ncase "CRVL": s++; M[s] = M[argInt]; break;\ncase "ARMZ": M[argInt] = M[s]; s--; break;`,
+        question: "33. Como as variáveis declaradas e a pilha de contas dividem o mesmo vetor 'M[]' sem que uma conta sobrescreva o valor de uma variável?",
+        hint: "Em correto.java.txt, para qual valor 's' vai após 'ALME 4'? E em qual posição o próximo 'CRCT' ou 'CRVL' vai empilhar?",
+        keywords: ["ALME", "M[0..3]", "M[4]", "CRVL", "ARMZ"],
+        shortAnswer: "Quando 'INPP' roda, 's = -1'. Logo em seguida, 'ALME 4' faz 's += 4', subindo 's' para 3 e reservando fixamente M[0], M[1], M[2] e M[3] para as 4 variáveis do programa. Qualquer instrução que empilha operandos ('CRCT', 'CRVL', 'LEIT') faz 's++' primeiro, escrevendo de M[4] em diante! E 'ARMZ' copia o resultado do topo M[s] para a variável M[argInt] e faz 's--', limpando o temporário.",
+        details: [
+          ["O que faz DESM 4 no final do programa?", "Faz 's -= 4', devolvendo 's' de 3 para -1 (pilha totalmente vazia antes do PARA)."]
+        ]
+      },
+      {
+        id: 34,
+        cat: "MAQUINA",
+        catName: "7. Máquina Hipotética & Código Objeto",
+        file: "src/compilador/maquina/MaquinaHipotetica.java",
+        lines: "Linhas 97 a 116",
+        codeTitle: "MaquinaHipotetica.java — Aritmética, Relacionais e Saltos (SUBT, DIVI, DSVF)",
+        code: `case "SOMA": M[s - 1] = M[s - 1] + M[s]; s--; break;\ncase "SUBT": M[s - 1] = M[s - 1] - M[s]; s--; break;\ncase "MULT": M[s - 1] = M[s - 1] * M[s]; s--; break;\ncase "DIVI":\n    if (M[s] == 0.0) throw new ArithmeticException("Erro em tempo de execucao: Divisao por zero na linha " + linhaAtual);\n    M[s - 1] = M[s - 1] / M[s]; s--;\n    break;\ncase "INVE": M[s] = -M[s]; break;\ncase "CPMA": M[s - 1] = (M[s - 1] > M[s]) ? 1.0 : 0.0; s--; break;\ncase "DSVI": i = argInt; break;\ncase "DSVF": if (M[s] == 0.0) i = argInt; s--; break;`,
+        question: "34. Por que em 'SUBT', 'DIVI' e 'CPMA' o operando da esquerda é 'M[s - 1]' e o da direita é 'M[s]'? E por que 'DSVF' sempre faz 's--'?",
+        hint: "Em 'a - b', quem foi empilhado primeiro e quem foi empilhado por último?",
+        keywords: ["M[s - 1]", "M[s]", "divisor", "1.0 e 0.0", "desempilha"],
+        shortAnswer: "Em uma expressão binária como 'a - b' ou 'a / b', o 1º operando ('a') é empilhado primeiro e fica na sub-base 'M[s - 1]', enquanto o 2º operando ('b') é empilhado depois e fica no topo 'M[s]'. Por isso fazemos 'M[s - 1] - M[s]' e testamos divisor zero em 'M[s] == 0.0'. Já o 'DSVF' sempre faz 's--' para consumir e retirar da pilha o valor booleano (1.0 ou 0.0) deixado pela comparação relacional.",
+        details: [
+          ["Como os booleanos são representados na Máquina Hipotética?", "Como 1.0 para Verdadeiro e 0.0 para Falso nas instruções CPIG, CDIF, CPMA, CPME, CMAI e CPMI."]
+        ]
+      },
+      {
+        id: 35,
+        cat: "MAQUINA",
+        catName: "7. Máquina Hipotética & Código Objeto",
+        file: "codigo.objeto.txt",
+        lines: "Linhas 0 a 35 (36 instruções)",
+        codeTitle: "codigo.objeto.txt — O Programa Compilado de correto.java.txt",
+        code: `0: INPP      | 4: CRVL 0    | 12: CRVL 1    | 21: CRVL 2    | 27: CRVL 0\n1: ALME 4    | 5: CRCT 0    | 13: CRVL 2    | 22: CRVL 1    | 28: CRCT 1\n2: CRCT 10   | 6: CPMA      | 14: CPMA      | 23: SUBT      | 29: SUBT\n3: ARMZ 0    | 7: DSVF 32   | 15: DSVF 21   | 24: ARMZ 3    | 30: ARMZ 0\n             | 8: LEIT      | 16: CRVL 1    | 25: CRVL 3    | 31: DSVI 4\n             | 9: ARMZ 1    | 17: CRVL 2    | 26: IMPR      | 32: CRVL 3\n             | 10: LEIT     | 18: SUBT      |               | 33: IMPR\n             | 11: ARMZ 2   | 19: ARMZ 3    |               | 34: DESM 4\n             |              | 20: DSVI 25   |               | 35: PARA`,
+        question: "35. Se o professor abrir o 'codigo.objeto.txt' e pedir para você explicar o que fazem as linhas 4..7, 12..24 e 27..31, o que você responde?",
+        hint: "Lembre quem são os endereços 0 (cont), 1 (a), 2 (b) e 3 (c)!",
+        keywords: ["while", "DSVF 32", "if/else", "DSVI 25", "DSVI 4"],
+        shortAnswer: "• Linhas 4 a 7: Testam a condição do 'while (cont > 0)'. Carrega cont (0) e 0, compara CPMA e, se for falso, 'DSVF 32' pula para fora do laço (linha 32). • Linhas 12 a 24: É o 'if (a > b) { c = a - b; } else { c = b - a; }'. 'DSVF 21' pula para o else se a <= b, e 'DSVI 25' no fim do if pula o else. • Linhas 27 a 31: Fazem 'cont = cont - 1' e 'DSVI 4' volta para reavaliar o while na linha 4!",
+        details: [
+          ["E o que fazem as linhas 32 a 35?", "Imprimem o valor final de 'c' após o término do while (CRVL 3, IMPR), desalocam as 4 variáveis (DESM 4) e encerram a VM (PARA)."]
+        ]
+      },
+      {
+        id: 36,
+        cat: "MAQUINA",
+        catName: "7. Máquina Hipotética & Código Objeto",
+        file: "src/compilador/MainCompilador.java",
+        lines: "Linhas 40 a 87",
+        codeTitle: "MainCompilador.java — Pipeline das 4 Fases e Tratamento de Erros",
+        code: `// FASE 1: ANÁLISE LÉXICA\nLexer analisadorLexico = Lexer.fromFile(caminhoFonte);\nList<Lexer.Token> listaDeTokens = analisadorLexico.tokenizarTodos();\n// FASE 2: ANÁLISE SINTÁTICA ASCENDENTE SLR(1)\nParserSLR analisadorSintatico = new ParserSLR();\nParserSLR.ResultadoParser resultadoSintatico = analisadorSintatico.analisar(listaDeTokens);\n// FASE 3: ANÁLISE SEMÂNTICA\nAnalisadorSemantico analisadorSemantico = new AnalisadorSemantico();\nAnalisadorSemantico.TabelaSimbolos tabelaSimbolos = analisadorSemantico.analisar(resultadoSintatico.raiz);\n// FASE 4: GERAÇÃO DE CÓDIGO OBJETO\nTradutorCodigo tradutor = new TradutorCodigo(tabelaSimbolos);\ntradutor.traduzir(resultadoSintatico.raiz);\ntradutor.salvarArquivo(caminhoObjeto);`,
+        question: "36. Como o 'MainCompilador' conecta as 4 fases (o que entra e o que sai de cada uma) e o que acontece se houver erro na Fase 1, 2 ou 3?",
+        hint: "Olhe os parâmetros que são passados de uma fase para a próxima!",
+        keywords: ["Tokens", "NoSintatico", "TabelaSimbolos", "codigo.objeto.txt", "exceção"],
+        shortAnswer: "1) O Lexer recebe o arquivo fonte e devolve 'List<Token>'; 2) O ParserSLR recebe os tokens e devolve a raiz da árvore sintática ('resultadoSintatico.raiz'); 3) O AnalisadorSemantico recebe a raiz da árvore e devolve a 'TabelaSimbolos' validada; 4) O TradutorCodigo recebe a TabelaSimbolos e a raiz da árvore e gera 'codigo.objeto.txt'. Se qualquer fase lançar exceção (Lexical, Syntactic ou SemanticException), cai no catch correspondente, exibe o erro e aborta com System.exit(1) sem gerar código objeto inválido.",
+        details: [
+          ["E como a Parte 1 se conecta com a Parte 2 (MainMaquina)?", "Exclusivamente através do arquivo texto 'codigo.objeto.txt', mantendo o compilador e a máquina virtual 100% desacoplados!"]
+        ]
+      }
+    ];
+
+    // ============================================================================
+    // BANCO DE 20 QUESTÕES DO SIMULADO / QUIZ INTERATIVO
+    // ============================================================================
+    const QUIZ = [
+      {
+        topic: "Lexer.java • Símbolos Compostos",
+        question: "1. Por que o Lexer reconhece 'System.out.println' como um único token (Tipo.PRINT) em vez de vários tokens separados por ponto?",
+        code: `if ("System".equals(palavra) && codigoFonte.startsWith(".out.println", posicaoAtual)) {\n    for (int i = 0; i < ".out.println".length(); i++) lerProximoCaractere();\n    return new Token(Tipo.PRINT, "System.out.println", linhaToken, colunaToken);\n}`,
+        options: [
+          "A) Porque o Java não permite usar o caractere ponto '.' dentro de strings.",
+          "B) Porque na gramática lalg-java não existem objetos genéricos nem operador '.'; 'System.out.println' é definido como um único símbolo terminal atômico.",
+          "C) Para economizar memória na Tabela de Símbolos do Analisador Semântico.",
+          "D) Porque a Máquina Hipotética não possui a instrução IMPR."
+        ],
+        correct: 1,
+        explanation: "Correto! Na gramática lalg-java (Regra 15: CMD -> System.out.println ( <EXPRESSAO> )), o comando de saída é um terminal único. A linguagem não modela classes, pacotes nem operador '.'."
+      },
+      {
+        topic: "lalg-java.txt • Restrição Sintática",
+        question: "2. Na gramática do projeto, por que 'lerDouble()' está na regra EXP_IDENT (R21) e NÃO dentro de FATOR?",
+        code: `R19: RESTO_IDENT -> = <EXP_IDENT>\nR20: EXP_IDENT   -> <EXPRESSAO>\nR21: EXP_IDENT   -> lerDouble()\nR33: FATOR       -> id | numero_real | ( <EXPRESSAO> )`,
+        options: [
+          "A) Para impedir que 'lerDouble()' seja usado no meio de expressões aritméticas (como 'a = lerDouble() + 1;'), permitindo-o apenas isolado à direita de '='.",
+          "B) Porque 'lerDouble()' retorna uma String e não um double.",
+          "C) Porque a instrução LEIT desempilha dois valores da memória M[].",
+          "D) Para permitir que 'lerDouble()' seja chamado dentro da condição do while."
+        ],
+        correct: 0,
+        explanation: "Exato! Colocar lerDouble() em EXP_IDENT garante sintaticamente que a leitura do teclado só possa ocorrer em comandos do tipo 'id = lerDouble();'."
+      },
+      {
+        topic: "TabelaSLR.java • Teoria SLR(1)",
+        question: "3. O que faz o laço 'for' abaixo no método adicionarReduce() e por que ele define um parser SLR(1)?",
+        code: `private void adicionarReduce(int estadoAtual, int numeroDaRegra) {\n    Regra regra = regrasDaGramatica.get(numeroDaRegra);\n    for (Lexer.Tipo tokenDoFollow : conjuntoFollow.get(regra.ladoEsquerdo)) {\n        tabelaAction.computeIfAbsent(estadoAtual, k -> new HashMap<>())\n                    .put(tokenDoFollow, new Acao(AcaoTipo.REDUCE, 0, regra));\n    }\n}`,
+        options: [
+          "A) Coloca a ação REDUCE em todos os 34 terminais da gramática, exatamente como no LR(0).",
+          "B) Coloca a ação REDUCE apenas para os tokens que pertencem ao FIRST do lado direito da regra.",
+          "C) Restringe a ação REDUCE naquele estado exclusivamente às colunas dos tokens que pertencem a FOLLOW(ladoEsquerdo), evitando conflitos Shift/Reduce.",
+          "D) Preenche a tabela GOTO com os estados de destino após um SHIFT."
+        ],
+        correct: 2,
+        explanation: "Perfeito! A essência do SLR(1) é usar o conjunto FOLLOW(A) como lookahead de 1 token para decidir quando aplicar a redução de uma regra A -> β."
+      },
+      {
+        topic: "ParserSLR.java • Construção da Árvore",
+        question: "4. No bloco 'case REDUCE' do ParserSLR, por que inserimos cada filho desempilhado usando 'novoNoPai.filhos.add(0, pilhaDeNos.pop())'?",
+        code: `for (int k = 0; k < regra.ladoDireito.length; k++) {\n    pilhaDeEstados.pop();\n    novoNoPai.filhos.add(0, pilhaDeNos.pop());\n}`,
+        options: [
+          "A) Porque o índice 0 aponta para o estado inicial da tabela SLR.",
+          "B) Porque a pilha desempilha em ordem inversa (LIFO, da direita para a esquerda); inserir sempre no índice 0 mantém os filhos ordenados da esquerda para a direita.",
+          "C) Para apagar os nós anteriores e manter apenas 1 filho por nó.",
+          "D) Porque regras vazias (λ) têm tamanho 1 na pilha."
+        ],
+        correct: 1,
+        explanation: "Exato! Como o último símbolo da regra está no topo da pilha, ele sai primeiro no pop(). Inserindo sempre na posição 0, a lista final de filhos fica na ordem correta da regra."
+      },
+      {
+        topic: "ParserSLR.java • Regras Vazias (λ)",
+        question: "5. O que acontece no 'case REDUCE' quando o parser reduz uma regra vazia (λ), como 'R11: CMDS -> vazio' ou 'R32: OP_UN -> vazio'?",
+        code: `/* R11 */ adicionarRegra(CMDS); // vazio (ladoDireito.length == 0)`,
+        options: [
+          "A) O laço 'for' roda 0 vezes (não desempilha nenhum estado nem nó), cria o nó pai vazio e empilha o novo estado consultado na tabela GOTO.",
+          "B) O parser desempilha 1 estado e 1 token da pilha.",
+          "C) O parser avança 'indiceTokenAtual++' sem empilhar nada.",
+          "D) O parser encerra imediatamente com ACCEPT."
+        ],
+        correct: 0,
+        explanation: "Isso mesmo! Em uma produção vazia A -> λ, |β| = 0. Nenhum símbolo é desempilhado, mas o nó A é criado e empilhado junto com GOTO[topo, A]."
+      },
+      {
+        topic: "TabelaSLR.java • Os 6 Estados Hubs",
+        question: "6. Por que existem 6 estados diferentes (16, 26, 33, 73, 81 e 92) configurados por 'configurarHubDeComandos' se todos têm os mesmos SHIFTs?",
+        code: `configurarHubDeComandos(16, 25); // main\nconfigurarHubDeComandos(26, 38); // pós if/while\nconfigurarHubDeComandos(33, 50); // pós ;\nconfigurarHubDeComandos(73, 82); // corpo if\nconfigurarHubDeComandos(81, 86); // corpo while\nconfigurarHubDeComandos(92, 93); // corpo else`,
+        options: [
+          "A) Porque cada estado lê um token diferente de início de comando.",
+          "B) Porque cada um representa a leitura de <CMDS> em um contexto sintático diferente e possui um destino GOTO(estado, CMDS) específico para fechar a regra correta.",
+          "C) Para permitir até 6 variáveis declaradas no programa.",
+          "D) Porque o Java exige pelo menos 6 estados em qualquer enum."
+        ],
+        correct: 1,
+        explanation: "Exatamente! O estado na pilha guarda 'quem' abriu aquele bloco <CMDS> (main, if, while, else, pós-';' ou pós-bloco), mudando o estado de destino na tabela GOTO quando <CMDS> é reduzido."
+      },
+      {
+        topic: "lalg-java.txt • Ponto-e-Vírgula",
+        question: "7. Como a gramática obriga que atribuições e declarações terminem com ';', mas proíbe ';' logo após fechar '}' de um 'if' ou 'while'?",
+        code: `R2: DC        -> <VAR> <MAIS_CMDS>\nR8: CMDS      -> <CMD> <MAIS_CMDS>\nR9: CMDS      -> <CMD_COND> <CMDS>\nR12: MAIS_CMDS -> ; <CMDS>`,
+        options: [
+          "A) O Lexer ignora todos os pontos-e-vírgulas após chaves '}'.",
+          "B) Porque <CMD> e <VAR> são seguidos por <MAIS_CMDS> (que começa com ';'), enquanto <CMD_COND> é seguido diretamente por <CMDS> sem passar por <MAIS_CMDS>.",
+          "C) O Analisador Semântico remove os pontos-e-vírgulas extras.",
+          "D) Na verdade, 'if' e 'while' também exigem ';' no final."
+        ],
+        correct: 1,
+        explanation: "Perfeito! Em R8 e R2, <MAIS_CMDS> impõe '; <CMDS>'. Já em R9, após o '}' de <CMD_COND>, vem <CMDS> diretamente."
+      },
+      {
+        topic: "AnalisadorSemantico.java • Filho 15",
+        question: "8. Por que o método 'analisar()' do Analisador Semântico inicia a busca em 'noRaizProg.getFilho(15)'?",
+        code: `public TabelaSimbolos analisar(ParserSLR.NoSintatico noRaizProg) {\n    percorrerComandos(noRaizProg.getFilho(15));\n    return tabela;\n}`,
+        options: [
+          "A) Porque toda árvore sintática tem no máximo 15 nós.",
+          "B) Para pular os 15 símbolos do cabeçalho da classe e do método main (índices 0 a 14, que contêm os IDs 'Teste' e 'args') e analisar diretamente o bloco <CMDS>.",
+          "C) Porque o Estado 15 é o estado de aceitação da tabela SLR.",
+          "D) Para ignorar a primeira variável declarada no programa."
+        ],
+        correct: 1,
+        explanation: "Exato! Os filhos 0 a 14 de PROG são 'public class id { public static void main ( String [ ] id ) {'. O filho 15 é <CMDS>."
+      },
+      {
+        topic: "AnalisadorSemantico.java • Endereçamento",
+        question: "9. Como o Analisador Semântico define o endereço de memória (0, 1, 2, 3...) de cada variável declarada?",
+        code: `private final Map<String, Simbolo> variaveisDeclaradas = new LinkedHashMap<>();\n// ...\nSimbolo novo = new Simbolo(nome, "double", variaveisDeclaradas.size(), tokenVariavel.linha, tokenVariavel.coluna);\nvariaveisDeclaradas.put(nome, novo);`,
+        options: [
+          "A) Usa o número da linha onde a variável foi declarada como endereço.",
+          "B) Gera um número aleatório entre 0 e 10000.",
+          "C) Usa 'variaveisDeclaradas.size()' no momento da inserção em um LinkedHashMap, numerando sequencialmente 0, 1, 2... na ordem exata de declaração.",
+          "D) Ordena as variáveis em ordem alfabética."
+        ],
+        correct: 2,
+        explanation: "Correto! Ao inserir no LinkedHashMap usando size() antes do put(), a 1ª variável ganha endereço 0, a 2ª ganha 1, etc."
+      },
+      {
+        topic: "AnalisadorSemantico.java • Declaração vs Uso",
+        question: "10. Em 'percorrerComandos', por que existe um 'return;' logo após 'cadastrarVariaveis(no);' quando encontra um nó 'VAR'?",
+        code: `if (no.naoTerminal == ParserSLR.NaoTerminal.VAR) {\n    cadastrarVariaveis(no);\n    return;\n}\nif (no.getTipoToken() == Lexer.Tipo.ID) {\n    tabela.verificarDeclarada(no.token);\n    return;\n}`,
+        options: [
+          "A) Para encerrar toda a compilação após a primeira linha de variáveis.",
+          "B) Porque 'cadastrarVariaveis(no)' já percorreu e inseriu todos os IDs daquele nó VAR; o 'return' evita descer novamente nos mesmos filhos.",
+          "C) Porque a linguagem só permite declarar uma única variável por programa.",
+          "D) Para pular a geração de código objeto."
+        ],
+        correct: 1,
+        explanation: "Isso mesmo! cadastrarVariaveis(no) já visita toda a subárvore de VAR inserindo cada ID na tabela; o return faz percorrerComandos seguir para o próximo irmão na árvore."
+      },
+      {
+        topic: "TradutorCodigo.java • Backpatching",
+        question: "11. O que é a técnica de Backpatching implementada em 'TradutorCodigo.java'?",
+        code: `int linhaDsvf = emitir("DSVF", -1);\ntraduzirBlocoComandos(noCorpoPrincipal);\ncorrigirDesvio(linhaDsvf, listaInstrucoes.size());`,
+        options: [
+          "A) Executar o código de trás para frente na Máquina Hipotética.",
+          "B) Emitir uma instrução de desvio (DSVF/DSVI) com endereço provisório (-1) e preencher o endereço real de destino assim que o bloco termina de ser traduzido.",
+          "C) Apagar instruções duplicadas do arquivo codigo.objeto.txt.",
+          "D) Desempilhar estados quando ocorre um erro sintático."
+        ],
+        correct: 1,
+        explanation: "Perfeito! Como a tradução é feita em 1 passada, o fim do bloco ainda não é conhecido no momento do DSVF; o endereço é preenchido retroativamente via corrigirDesvio()."
+      },
+      {
+        topic: "TradutorCodigo.java • If com Else",
+        question: "12. Na tradução de um 'if (a > b) { ... } else { ... }', qual é a função da instrução 'DSVI' emitida exatamente no final do bloco 'if'?",
+        code: `if (noElse.getQtdFilhos() >= 4) { // Tem bloco "else { CMDS }"\n    int linhaDsvi = emitir("DSVI", -1);\n    corrigirDesvio(linhaDsvf, listaInstrucoes.size());\n    traduzirBlocoComandos(noElse.getFilho(2));\n    corrigirDesvio(linhaDsvi, listaInstrucoes.size());\n}`,
+        options: [
+          "A) Voltar para o início do 'if' e testar a condição novamente.",
+          "B) Pular o bloco do 'else' após terminar de executar o bloco verdadeiro do 'if', indo direto para a instrução seguinte ao 'if/else'.",
+          "C) Desalocar as variáveis usadas dentro do 'if'.",
+          "D) Entrar no bloco 'else' quando a condição do 'if' for falsa."
+        ],
+        correct: 1,
+        explanation: "Exato! Sem esse DSVI no fim do bloco verdadeiro, a CPU executaria o bloco do 'if' e continuaria caindo dentro do bloco do 'else' logo abaixo!"
+      },
+      {
+        topic: "TradutorCodigo.java • Operador Unário",
+        question: "13. Em 'traduzirTermo', por que traduzimos 'noTermo.getFilho(1)' (FATOR) ANTES de emitir a instrução 'INVE' do sinal negativo (filho 0)?",
+        code: `private void traduzirTermo(ParserSLR.NoSintatico noTermo) {\n    traduzirFator(noTermo.getFilho(1));\n    ParserSLR.NoSintatico noOpUn = noTermo.getFilho(0);\n    if (noOpUn.getQtdFilhos() > 0 && noOpUn.getFilho(0).getTipoToken() == Lexer.Tipo.MENOS) {\n        emitir("INVE");\n    }\n    traduzirMaisFatores(noTermo.getFilho(2));\n}`,
+        options: [
+          "A) Porque 'INVE' opera sobre o valor que já está no topo da pilha (M[s] = -M[s]), então o número/variável precisa ser empilhado primeiro.",
+          "B) Porque na gramática o sinal '-' vem depois do número.",
+          "C) Porque 'INVE' soma dois números na pilha.",
+          "D) Por acaso; a ordem entre CRCT e INVE não altera o resultado."
+        ],
+        correct: 0,
+        explanation: "Correto! Em uma máquina de pilha, primeiro empilhamos o operando (ex: CRCT 5) e depois aplicamos o operador unário sobre o topo (INVE -> -5)."
+      },
+      {
+        topic: "TradutorCodigo.java • CRCT vs CRVL",
+        question: "14. Qual a diferença entre as instruções 'CRCT' e 'CRVL' geradas por 'traduzirFator'?",
+        code: `if (primeiro.getTipoToken() == Lexer.Tipo.ID) {\n    emitir("CRVL", tabelaSimbolos.obterEndereco(primeiro.getLexema()));\n} else if (primeiro.getTipoToken() == Lexer.Tipo.NUMERO_REAL) {\n    emitir("CRCT", Double.parseDouble(primeiro.getLexema()));\n}`,
+        options: [
+          "A) CRCT salva no disco e CRVL lê do teclado.",
+          "B) CRCT empilha o valor literal de uma constante numérica (ex: CRCT 10), enquanto CRVL busca o valor guardado no endereço de memória de uma variável (ex: CRVL 0 -> empilha M[0]).",
+          "C) CRCT é usado para inteiros e CRVL para números com ponto.",
+          "D) Não há diferença, fazem exatamente a mesma coisa na VM."
+        ],
+        correct: 1,
+        explanation: "Perfeito! CRCT = Carregar Constante (`M[s] = inst.argumento`); CRVL = Carregar Valor da memória (`M[s] = M[argInt]`)."
+      },
+      {
+        topic: "MaquinaHipotetica.java • Registrador s",
+        question: "15. Na Máquina Hipotética, por que o registrador de topo da pilha 's' é inicializado com '-1' em vez de '0'?",
+        code: `private final double[] M = new double[10000];\nprivate int i = 0;  // Linha da próxima instrução\nprivate int s = -1; // Topo da pilha de dados M[]`,
+        options: [
+          "A) Para representar um número negativo na primeira conta.",
+          "B) Porque o vetor M[] é 0-indexado: quando a pilha está vazia, não há nenhum elemento no topo (-1); assim, o 1º empilhamento (s++) grava exatamente no índice M[0].",
+          "C) Porque a posição M[0] é proibida na linguagem Java.",
+          "D) Porque a instrução INPP soma 1 em s."
+        ],
+        correct: 1,
+        explanation: "Exato! Com s = -1 indicando pilha vazia, 'ALME 4' faz s += 4 (s = 3), reservando M[0], M[1], M[2] e M[3] para as 4 variáveis."
+      },
+      {
+        topic: "MaquinaHipotetica.java • Ciclo de Busca (Fetch)",
+        question: "16. No laço principal de execução da Máquina Hipotética, por que fazemos 'int linhaAtual = i++;' logo no começo do ciclo?",
+        code: `while (rodando && i >= 0 && i < programa.size()) {\n    ciclo++;\n    int linhaAtual = i++; // Lê a linha atual e já avança 'i' para a próxima instrução\n    InstrucaoVM inst = programa.get(linhaAtual);`,
+        options: [
+          "A) Para pular as instruções pares do programa.",
+          "B) Para simular o ciclo Fetch-Decode-Execute: busca a instrução em 'linhaAtual' e já deixa o Program Counter 'i' apontando para a linha seguinte (podendo ser sobrescrito se a instrução for DSVI ou DSVF).",
+          "C) Porque o arquivo codigo.objeto.txt começa na linha 1 e não na 0.",
+          "D) Para incrementar o topo da pilha de dados."
+        ],
+        correct: 1,
+        explanation: "Isso mesmo! O PC 'i' avança automaticamente para a próxima instrução, exceto quando uma instrução de desvio (DSVI, DSVF, CHPR, RTPR) atribui um novo endereço a 'i'."
+      },
+      {
+        topic: "MaquinaHipotetica.java • Ordem dos Operandos",
+        question: "17. Por que na instrução 'SUBT' fazemos 'M[s - 1] = M[s - 1] - M[s]; s--;' e na 'DIVI' testamos se 'M[s] == 0.0'?",
+        code: `case "SUBT": M[s - 1] = M[s - 1] - M[s]; s--; break;\ncase "DIVI":\n    if (M[s] == 0.0) throw new ArithmeticException(...);\n    M[s - 1] = M[s - 1] / M[s]; s--;\n    break;`,
+        options: [
+          "A) Porque em 'a - b' ou 'a / b', o 1º operando ('a') é empilhado primeiro e fica em M[s - 1], enquanto o 2º operando ('b', subtraendo/divisor) é empilhado por último e fica no topo M[s].",
+          "B) Porque M[s - 1] é sempre zero.",
+          "C) Porque o compilador traduz as expressões da direita para a esquerda.",
+          "D) Porque M[s] guarda o endereço da variável e M[s - 1] o valor."
+        ],
+        correct: 0,
+        explanation: "Exato! Subtração e divisão não são comutativas: o primeiro operando está em s-1 e o segundo (divisor/subtraendo) está no topo s."
+      },
+      {
+        topic: "MaquinaHipotetica.java • Instrução DSVF",
+        question: "18. Na instrução 'DSVF', por que o comando 's--' fica fora do 'if (M[s] == 0.0)', sendo executado sempre?",
+        code: `case "DSVF": if (M[s] == 0.0) i = argInt; s--; break;`,
+        options: [
+          "A) Para apagar uma variável declarada pelo usuário a cada if.",
+          "B) Porque o resultado booleano da comparação (1.0 ou 0.0) que estava no topo M[s] já foi testado pelo DSVF e precisa ser desempilhado tanto se o salto ocorrer quanto se não ocorrer.",
+          "C) Para decrementar o contador do while automaticamente.",
+          "D) É um erro; o s-- só deveria acontecer quando M[s] == 0.0."
+        ],
+        correct: 1,
+        explanation: "Perfeito! Se não desempilhasse o booleano (1.0 ou 0.0) do topo com s--, a pilha acumularia lixo a cada teste condicional!"
+      },
+      {
+        topic: "MaquinaHipotetica.java • ALME vs ARMZ",
+        question: "19. Qual a diferença entre 'ALME 4' e 'ARMZ 0' na manipulação da memória 'M[]' e do ponteiro 's'?",
+        code: `case "ALME": s += argInt; break;\ncase "ARMZ": M[argInt] = M[s]; s--; break;`,
+        options: [
+          "A) ALME 4 grava o número 4 na posição 0; ARMZ 0 apaga a memória.",
+          "B) ALME 4 avança 's += 4' para reservar 4 posições de variáveis no início do programa; já ARMZ 0 desempilha o resultado do topo M[s] ('s--') e o guarda na variável M[0].",
+          "C) Ambos aumentam o topo da pilha em 4 unidades.",
+          "D) ALME é usado no fim do programa e ARMZ no início."
+        ],
+        correct: 1,
+        explanation: "Correto! ALME reserva espaço estático para as variáveis subindo 's', enquanto ARMZ consome o valor calculado no topo da pilha e grava no endereço da variável."
+      },
+      {
+        topic: "codigo.objeto.txt • Visão Geral",
+        question: "20. Em 'correto.java.txt', qual é o valor do topo da pilha 's' após '1: ALME 4', durante a avaliação de 'a > b' (após empilhar a e b), e após '34: DESM 4'?",
+        code: `0: INPP      (s = -1)\n1: ALME 4    (s = ?)\n...\n12: CRVL 1   (empilha a)\n13: CRVL 2   (empilha b -> s = ?)\n14: CPMA     (compara a > b)\n...\n34: DESM 4   (s = ?)\n35: PARA`,
+        options: [
+          "A) s = 4 após ALME 4; s = 6 após empilhar a e b; s = 0 após DESM 4.",
+          "B) s = 3 após ALME 4 (M[0..3]); s = 5 após empilhar a (M[4]) e b (M[5]); e s = -1 após DESM 4.",
+          "C) s = 0 o tempo todo.",
+          "D) s = -1 após ALME 4; s = 2 após empilhar a e b; s = 4 após DESM 4."
+        ],
+        correct: 1,
+        explanation: "Nota 10! Como s começa em -1: após ALME 4, s = 3 (M[0..3] são as variáveis). Ao empilhar 'a' (M[4]) e 'b' (M[5]), s chega a 5. No final, todo comando equilibra a pilha de volta para s = 3, e DESM 4 devolve s para -1!"
+      }
+    ];
+
+    // ============================================================================
+    // ESTADO DA APLICAÇÃO E PERSISTÊNCIA (LOCALSTORAGE)
+    // ============================================================================
+    let currentMode = 'flashcards';
+    let filteredCards = [...FLASHCARDS];
+    let currentCardIndex = 0;
+    let currentQuizIndex = 0;
+
+    // Estado salvo no navegador do usuário
+    let userNotes = JSON.parse(localStorage.getItem('comp_fc_notes') || '{}');
+    let cardRatings = JSON.parse(localStorage.getItem('comp_fc_ratings') || '{}');
+    let quizAnswers = JSON.parse(localStorage.getItem('comp_qz_answers') || '{}');
+    let quizNotes = JSON.parse(localStorage.getItem('comp_qz_notes') || '{}');
+
+    function esc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function normalizeText(str) {
+      return String(str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    }
+
+    // ============================================================================
+    // NAVEGAÇÃO ENTRE ABAS (FLASHCARDS / QUIZ / CATÁLOGO)
+    // ============================================================================
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById('view-flashcards').classList.toggle('hidden', mode !== 'flashcards');
+      document.getElementById('view-quiz').classList.toggle('hidden', mode !== 'quiz');
+      document.getElementById('view-catalog').classList.toggle('hidden', mode !== 'catalog');
+      document.getElementById('filter-container').classList.toggle('hidden', mode === 'quiz');
+
+      const tabs = ['flashcards', 'quiz', 'catalog'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tab-' + t);
+        if (t === mode) {
+          btn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-[var(--primary)] text-[var(--primary-foreground)] transition';
+        } else {
+          btn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)] transition';
+        }
+      });
+
+      if (mode === 'flashcards') renderFlashcard();
+      if (mode === 'quiz') renderQuiz();
+      if (mode === 'catalog') renderCatalog();
+    }
+
+    // ============================================================================
+    // LÓGICA DOS FLASHCARDS
+    // ============================================================================
+    function applyFilter(filterVal) {
+      if (filterVal === 'ALL') {
+        filteredCards = [...FLASHCARDS];
+      } else if (filterVal === 'NEED_REVIEW') {
+        filteredCards = FLASHCARDS.filter(c => cardRatings[c.id] === 'review');
+      } else if (filterVal === 'NOT_MASTERED') {
+        filteredCards = FLASHCARDS.filter(c => cardRatings[c.id] !== 'mastered');
+      } else {
+        filteredCards = FLASHCARDS.filter(c => c.cat === filterVal);
+      }
+
+      if (filteredCards.length === 0) {
+        filteredCards = [...FLASHCARDS];
+        document.getElementById('category-select').value = 'ALL';
+      }
+
+      currentCardIndex = 0;
+      renderFlashcard();
+      if (currentMode === 'catalog') renderCatalog();
+    }
+
+    function updateGlobalStats() {
+      let mastered = 0, learning = 0, review = 0;
+      FLASHCARDS.forEach(c => {
+        const r = cardRatings[c.id];
+        if (r === 'mastered') mastered++;
+        else if (r === 'learning') learning++;
+        else if (r === 'review') review++;
+      });
+      document.getElementById('stat-mastered').textContent = mastered;
+      document.getElementById('stat-learning').textContent = learning;
+      document.getElementById('stat-review').textContent = review;
+      document.getElementById('stat-total').textContent = FLASHCARDS.length;
+    }
+
+    function renderFlashcard() {
+      updateGlobalStats();
+      const card = filteredCards[currentCardIndex];
+      if (!card) return;
+
+      document.getElementById('fc-counter').textContent = `CARD ${currentCardIndex + 1} / ${filteredCards.length} (ID #${card.id})`;
+      document.getElementById('fc-badge-file').textContent = `${card.file} (${card.lines})`;
+      document.getElementById('fc-category').textContent = card.catName;
+      document.getElementById('fc-lines').textContent = card.lines;
+      document.getElementById('fc-question').textContent = card.question;
+      document.getElementById('fc-code-title').textContent = card.codeTitle;
+      document.getElementById('fc-code').innerHTML = esc(card.code);
+      document.getElementById('fc-hint-text').textContent = card.hint;
+
+      // Status pill
+      const statusPill = document.getElementById('fc-status-pill');
+      const r = cardRatings[card.id];
+      if (r === 'mastered') {
+        statusPill.textContent = '🟢 Dominado';
+        statusPill.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-[#22c55e]/15 text-[#22c55e]';
+      } else if (r === 'learning') {
+        statusPill.textContent = '🟡 Quase lá';
+        statusPill.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-[#eab308]/15 text-[#eab308]';
+      } else if (r === 'review') {
+        statusPill.textContent = '🔴 Preciso Revisar';
+        statusPill.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-[#ef4444]/15 text-[#ef4444]';
+      } else {
+        statusPill.textContent = '⚪ Ainda não avaliado';
+        statusPill.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-[var(--secondary)] text-[var(--muted-foreground)]';
+      }
+
+      // Reset hint & answer visibility
+      document.getElementById('fc-hint-box').classList.add('hidden');
+      document.getElementById('fc-answer-panel').classList.add('hidden');
+      document.getElementById('btn-reveal').textContent = '👁️ Revelar Resposta Oficial do Professor';
+
+      // Load user note
+      const savedText = userNotes[card.id] || '';
+      document.getElementById('fc-user-input').value = savedText;
+      updateKeywordPills(card, savedText, false);
+
+      // Populate answer panel
+      document.getElementById('fc-short-answer').textContent = card.shortAnswer;
+      document.getElementById('fc-detailed-points').innerHTML = card.details.map(([title, body]) => `
+        <div class="p-3.5 rounded-xl bg-[var(--secondary)] border border-[var(--border)]">
+          <div class="text-xs font-bold text-[var(--primary)] mb-1">${esc(title)}</div>
+          <div class="text-xs text-[var(--foreground)] leading-relaxed">${esc(body)}</div>
+        </div>
+      `).join('');
+    }
+
+    function updateKeywordPills(card, text, revealed) {
+      const normInput = normalizeText(text);
+      let hits = 0;
+      const html = card.keywords.map(kw => {
+        const matched = normInput.includes(normalizeText(kw));
+        if (matched) hits++;
+        const label = matched || revealed ? kw : '??? (' + kw.length + ' letras)';
+        const cls = matched
+          ? 'bg-[#22c55e]/20 text-[#22c55e] border-[#22c55e]/40 font-bold'
+          : 'bg-[var(--card)] text-[var(--muted-foreground)] border-[var(--border)]';
+        return `<span class="px-2.5 py-1 rounded-lg border text-xs ${cls}">${matched ? '✓ ' : ''}${esc(label)}</span>`;
+      }).join('');
+
+      document.getElementById('fc-kw-pills').innerHTML = html;
+      document.getElementById('fc-kw-count').textContent = `${hits} / ${card.keywords.length}`;
+    }
+
+    function handleNoteInput(val) {
+      const card = filteredCards[currentCardIndex];
+      if (!card) return;
+      userNotes[card.id] = val;
+      localStorage.setItem('comp_fc_notes', JSON.stringify(userNotes));
+      const isRevealed = !document.getElementById('fc-answer-panel').classList.contains('hidden');
+      updateKeywordPills(card, val, isRevealed);
+    }
+
+    function clearCurrentNote() {
+      const card = filteredCards[currentCardIndex];
+      if (!card) return;
+      delete userNotes[card.id];
+      localStorage.setItem('comp_fc_notes', JSON.stringify(userNotes));
+      document.getElementById('fc-user-input').value = '';
+      const isRevealed = !document.getElementById('fc-answer-panel').classList.contains('hidden');
+      updateKeywordPills(card, '', isRevealed);
+    }
+
+    function toggleHint() {
+      document.getElementById('fc-hint-box').classList.toggle('hidden');
+    }
+
+    function toggleAnswer() {
+      const panel = document.getElementById('fc-answer-panel');
+      const hidden = panel.classList.toggle('hidden');
+      document.getElementById('btn-reveal').textContent = hidden
+        ? '👁️ Revelar Resposta Oficial do Professor'
+        : '🙈 Ocultar Resposta Oficial';
+      const card = filteredCards[currentCardIndex];
+      if (card) {
+        updateKeywordPills(card, document.getElementById('fc-user-input').value, !hidden);
+      }
+    }
+
+    function rateCard(rating) {
+      const card = filteredCards[currentCardIndex];
+      if (!card) return;
+      cardRatings[card.id] = rating;
+      localStorage.setItem('comp_fc_ratings', JSON.stringify(cardRatings));
+      updateGlobalStats();
+      if (rating === 'mastered' && currentCardIndex < filteredCards.length - 1) {
+        currentCardIndex++;
+      }
+      renderFlashcard();
+    }
+
+    function prevCard() {
+      if (currentCardIndex > 0) {
+        currentCardIndex--;
+        renderFlashcard();
+      }
+    }
+
+    function nextCard() {
+      if (currentCardIndex < filteredCards.length - 1) {
+        currentCardIndex++;
+        renderFlashcard();
+      }
+    }
+
+    function randomCard() {
+      if (filteredCards.length <= 1) return;
+      let nextIdx = currentCardIndex;
+      while (nextIdx === currentCardIndex) {
+        nextIdx = Math.floor(Math.random() * filteredCards.length);
+      }
+      currentCardIndex = nextIdx;
+      renderFlashcard();
+    }
+
+    // ============================================================================
+    // LÓGICA DO SIMULADO / QUIZ
+    // ============================================================================
+    function renderQuiz() {
+      const q = QUIZ[currentQuizIndex];
+      document.getElementById('qz-counter').textContent = `QUESTÃO ${currentQuizIndex + 1} / ${QUIZ.length}`;
+      document.getElementById('qz-topic').textContent = q.topic;
+      document.getElementById('qz-question').textContent = q.question;
+      document.getElementById('qz-code').innerHTML = esc(q.code);
+      document.getElementById('qz-user-reason').value = quizNotes[currentQuizIndex] || '';
+
+      // Score calculation
+      let score = 0, answered = 0;
+      Object.keys(quizAnswers).forEach(k => {
+        answered++;
+        if (quizAnswers[k] === QUIZ[k].correct) score++;
+      });
+      document.getElementById('qz-score').textContent = score;
+      document.getElementById('qz-answered').textContent = answered;
+
+      const chosen = quizAnswers[currentQuizIndex];
+      const hasAnswered = chosen !== undefined;
+
+      document.getElementById('qz-options').innerHTML = q.options.map((opt, idx) => {
+        let style = 'bg-[var(--secondary)] text-[var(--foreground)] border-[var(--border)] hover:border-[var(--primary)]';
+        if (hasAnswered) {
+          if (idx === q.correct) {
+            style = 'bg-[#22c55e]/20 text-[var(--foreground)] border-[#22c55e] font-bold';
+          } else if (idx === chosen && chosen !== q.correct) {
+            style = 'bg-[#ef4444]/20 text-[var(--foreground)] border-[#ef4444]';
+          } else {
+            style = 'bg-[var(--secondary)] text-[var(--muted-foreground)] border-[var(--border)] opacity-60';
+          }
+        }
+        return `
+          <button onclick="selectQuizOption(${idx})"
+            class="w-full text-left p-3.5 rounded-xl border text-xs md:text-sm transition ${style}">
+            ${esc(opt)}
+          </button>
+        `;
+      }).join('');
+
+      const fb = document.getElementById('qz-feedback');
+      if (hasAnswered) {
+        const isRight = chosen === q.correct;
+        fb.classList.remove('hidden');
+        fb.className = isRight
+          ? 'p-4 rounded-xl border border-[#22c55e] bg-[#22c55e]/10 text-xs md:text-sm leading-relaxed'
+          : 'p-4 rounded-xl border border-[#ef4444] bg-[#ef4444]/10 text-xs md:text-sm leading-relaxed';
+        fb.innerHTML = `<strong class="${isRight ? 'text-[#22c55e]' : 'text-[#ef4444]'}">${isRight ? '✅ Resposta Correta!' : '❌ Atenção! Veja a explicação:'}</strong> ${esc(q.explanation)}`;
+      } else {
+        fb.classList.add('hidden');
+      }
+    }
+
+    function selectQuizOption(idx) {
+      quizAnswers[currentQuizIndex] = idx;
+      localStorage.setItem('comp_qz_answers', JSON.stringify(quizAnswers));
+      renderQuiz();
+    }
+
+    function saveQuizNote(val) {
+      quizNotes[currentQuizIndex] = val;
+      localStorage.setItem('comp_qz_notes', JSON.stringify(quizNotes));
+    }
+
+    function prevQuiz() {
+      if (currentQuizIndex > 0) {
+        currentQuizIndex--;
+        renderQuiz();
+      }
+    }
+
+    function nextQuiz() {
+      if (currentQuizIndex < QUIZ.length - 1) {
+        currentQuizIndex++;
+        renderQuiz();
+      }
+    }
+
+    function resetQuiz() {
+      quizAnswers = {};
+      quizNotes = {};
+      localStorage.removeItem('comp_qz_answers');
+      localStorage.removeItem('comp_qz_notes');
+      currentQuizIndex = 0;
+      renderQuiz();
+    }
+
+    // ============================================================================
+    // LÓGICA DO CATÁLOGO DE TODAS AS 36 PERGUNTAS
+    // ============================================================================
+    function renderCatalog() {
+      const grid = document.getElementById('catalog-grid');
+      grid.innerHTML = FLASHCARDS.map((c, idx) => {
+        const r = cardRatings[c.id];
+        const hasNote = Boolean((userNotes[c.id] || '').trim());
+        let badge = '⚪ Não avaliado';
+        let borderCls = 'border-[var(--border)]';
+        if (r === 'mastered') { badge = '🟢 Dominado'; borderCls = 'border-[#22c55e]/50'; }
+        else if (r === 'learning') { badge = '🟡 Quase lá'; borderCls = 'border-[#eab308]/50'; }
+        else if (r === 'review') { badge = '🔴 Revisar'; borderCls = 'border-[#ef4444]/50'; }
+
+        return `
+          <button onclick="openCardFromCatalog(${c.id})"
+            class="text-left p-4 rounded-xl bg-[var(--secondary)] border ${borderCls} hover:border-[var(--primary)] transition flex flex-col justify-between gap-2">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-xs font-bold text-[var(--primary)]">Card #${c.id} • ${esc(c.file)}</span>
+                <span class="text-xs font-semibold">${badge}</span>
+              </div>
+              <div class="text-xs font-bold text-[var(--foreground)] leading-snug">${esc(c.question)}</div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-[var(--muted-foreground)] pt-2 border-t border-[var(--border)]">
+              <span>${esc(c.lines)}</span>
+              <span>${hasNote ? '✍️ Resposta escrita' : 'Sem rascunho'}</span>
+            </div>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function openCardFromCatalog(cardId) {
+      document.getElementById('category-select').value = 'ALL';
+      filteredCards = [...FLASHCARDS];
+      currentCardIndex = FLASHCARDS.findIndex(c => c.id === cardId);
+      if (currentCardIndex < 0) currentCardIndex = 0;
+      switchMode('flashcards');
+    }
+
+    function resetAllProgress() {
+      userNotes = {};
+      cardRatings = {};
+      quizAnswers = {};
+      quizNotes = {};
+      localStorage.removeItem('comp_fc_notes');
+      localStorage.removeItem('comp_fc_ratings');
+      localStorage.removeItem('comp_qz_answers');
+      localStorage.removeItem('comp_qz_notes');
+      renderFlashcard();
+      renderCatalog();
+    }
+
+    // Inicialização
+    renderFlashcard();
+  </script>
+</body>
+</html>

@@ -51,6 +51,14 @@
         },
         {
             "type": "java",
+            "name": "Compilador - Teste Divisão por Zero",
+            "request": "launch",
+            "mainClass": "compilador.MainCompilador",
+            "args": "exemplos/erro_divisao_zero.java.txt",
+            "vmArgs": "-Dfile.encoding=UTF-8"
+        },
+        {
+            "type": "java",
             "name": "Máquina Hipotética (codigo.objeto.txt)",
             "request": "launch",
             "mainClass": "compilador.maquina.MainMaquina",

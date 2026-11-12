@@ -49,7 +49,7 @@ Todas as instruções operam sobre números em ponto flutuante de dupla precisã
 
 | Mnemônico | Argumento | Operação na Pilha e Memória | Descrição / Aplicação |
 | :--- | :---: | :--- | :--- |
-| `INPP` | - | `s = -1; i = 0;` | Inicia o programa principal (zera registradores). |
+| `INPP` | - | `s = -1;` | Inicia o programa principal (inicializa o topo da pilha vazia). |
 | `ALME` | `m` | `s = s + m;` | Aloca $m$ posições consecutivas de memória para variáveis locais. |
 | `DESM` | `m` | `s = s - m;` | Desaloca $m$ posições de memória antes de encerrar o programa. |
 | `CRCT` | `k` | `s++; M[s] = k;` | Empilha o valor constante literal $k$ (ex: `10.0`, `0.0`). |
@@ -72,8 +72,9 @@ Todas as instruções operam sobre números em ponto flutuante de dupla precisã
 | `IMPR` | - | `print(M[s]); s--;` | Desempilha o valor do topo e imprime no console. |
 | `PARA` | - | `terminou = true;` | Encerra definitivamente a execução da máquina hipotética. |
 | `PUSHER`| `p` | `s++; M[s] = p;` | Empilha endereço de retorno $p$ (suporte a procedimentos). |
+| `PARAM` | `n` | `s++; M[s] = M[n];` | Empilha parâmetro no endereço $n$ (suporte a procedimentos). |
 | `CHPR` | `p` | `i = p;` | Chama procedimento em $p$ (suporte a procedimentos). |
-| `RTPR` | - | `i = M[s]; s--;` | Retorna do procedimento para o endereço no topo. |
+| `RTPR` | - | `i = (int) M[s]; s--;` | Retorna do procedimento para o endereço no topo. |
 
 ---
 
@@ -184,13 +185,13 @@ while (rodando && i >= 0 && i < programa.size()) {
 
 ## 5. Resolução de Desvios (Técnica de Backpatching)
 
-Como o compilador traduz o código em uma única passada durante a redução sintática, no momento em que emite o desvio se falso `DSVF` de um comando `if` ou `while`, o endereço de destino ainda não é conhecido (pois o corpo do comando ainda não foi compilado).
+Como o `TradutorCodigo` traduz a Árvore Sintática Concreta (CST) em uma única passada, no momento em que emite o desvio se falso `DSVF` de um comando `if` ou `while`, o endereço de destino ainda não é conhecido (pois o corpo do comando ainda não foi traduzido).
 
 ### Como o Compilador Resolve Isso:
-1. Ao emitir `DSVF`, o compilador insere um endereço provisório indefinido (`-1`) e empilha o índice dessa instrução em uma pilha de desvios.
-2. Continua compilando o corpo do bloco normalmente.
-3. Ao finalizar o bloco (ou encontrar o `else`), recupera o índice guardado e atualiza a instrução anterior com o número da linha atual (`iAtual`).
-4. Essa técnica garante geração de código em tempo linear $O(n)$ sem necessidade de múltiplas passadas.
+1. Ao emitir `DSVF`, o tradutor insere um endereço provisório indefinido (`-1`) e guarda o índice dessa instrução em uma variável local (`int linhaDsvf = emitir("DSVF", -1)`).
+2. Continua traduzindo o corpo do bloco normalmente.
+3. Ao finalizar o bloco (ou encontrar o `else`), chama `corrigirDesvio(linhaDsvf, listaInstrucoes.size())` para atualizar a instrução anterior com a linha de destino real.
+4. Essa técnica garante geração de código em tempo linear $O(n)$ sem necessidade de múltiplas passadas sobre a árvore.
 
 ---
 

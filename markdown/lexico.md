@@ -23,7 +23,7 @@ O **Analisador Léxico (Lexer)** é o primeiro estágio do compilador. Sua funç
    +───────────────────────+
                │
                ▼
-  [Fluxo de Tokens: TokenTipo, Lexema, Linha, Coluna]
+  [Fluxo de Tokens: Lexer.Tipo, Lexema, Linha, Coluna]
                │
                ▼
    +───────────────────────+
@@ -37,7 +37,7 @@ O **Analisador Léxico (Lexer)** é o primeiro estágio do compilador. Sua funç
 
 O analisador léxico implementa o mapeamento estrito para os **33 terminais formais** da gramática `lalg-java` mais o delimitador de fim de arquivo (`$` / `EOF`):
 
-| Categoria | Lexema / Padrão | `TokenTipo` | Símbolo na Gramática | Descrição |
+| Categoria | Lexema / Padrão | `Lexer.Tipo` | Símbolo na Gramática | Descrição |
 | :--- | :--- | :--- | :--- | :--- |
 | **Palavras Reservadas** | `public` | `PUBLIC` | `public` | Modificador de acesso estrutural |
 | | `class` | `CLASS` | `class` | Declaração da classe principal |

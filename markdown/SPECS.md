@@ -143,9 +143,9 @@ O analisador léxico deve ser implementado **manualmente** (sem JFlex/Lex), util
 | Categoria | Lexemas / Padrão | Token Gerado |
 | :--- | :--- | :--- |
 | **Palavras Reservadas** | `public`, `class`, `static`, `void`, `main`, `String`, `double`, `if`, `else`, `while` | Tokens específicos com mesmo nome |
-| **Instruções Embutidas** | `System.out.println`, `lerDouble()` | `TOKEN_PRINT`, `TOKEN_LER_DOUBLE` |
-| **Identificadores** | `[a-zA-Z_][a-zA-Z0-9_]*` | `TOKEN_ID` (com lexema) |
-| **Números** | `[0-9]+(\.[0-9]+)?` | `TOKEN_NUMERO_REAL` (com valor double) |
+| **Instruções Embutidas** | `System.out.println`, `lerDouble()` | `PRINT`, `LER_DOUBLE` |
+| **Identificadores** | `[a-zA-Z_][a-zA-Z0-9_]*` | `ID` (com lexema) |
+| **Números** | `[0-9]+(\.[0-9]+)?` | `NUMERO_REAL` (com valor double) |
 | **Operadores Aritméticos** | `+`, `-`, `*`, `/` | `+`, `-`, `*`, `/` |
 | **Operadores Relacionais** | `==`, `!=`, `>=`, `<=`, `>`, `<` | `==`, `!=`, `>=`, `<=`, `>`, `<` |
 | **Atribuição** | `=` | `=` |
@@ -197,7 +197,7 @@ Armazena as informações dos identificadores:
 - `nome`: String (ex: `cont`, `a`, `b`, `c`).
 - `tipo`: Tipo do dado (`double`).
 - `endereco`: Endereço de memória na máquina hipotética (offset relativo: 0, 1, 2, ...).
-- `inicializada`: booleano (para avisos de uso sem inicialização prévia).
+- `linha` e `coluna`: Coordenadas de declaração no código-fonte.
 
 ### 5.2 Validações Semânticas Obrigatórias
 1. **Declaração Prévia:** Qualquer variável usada em `<EXPRESSAO>` ou `<CONDICAO>` ou como alvo de atribuição deve ter sido declarada em `<VAR>`. Caso contrário: Erro semântico *"Variável 'x' não declarada"*.
@@ -214,7 +214,7 @@ A Máquina Hipotética é uma arquitetura de pilha com memória linear de variá
 
 | Mnemônico | Argumento | Descrição na Máquina Hipotética |
 | :--- | :---: | :--- |
-| `INPP` | - | Inicia o Programa Principal (zera registradores e inicializa a máquina) |
+| `INPP` | - | Inicia o Programa Principal (inicializa o topo da pilha `s = -1`) |
 | `ALME` | `m` | Aloca `m` posições consecutivas de memória para variáveis (`s = s + m`) |
 | `DESM` | `m` | Desaloca `m` posições de memória (`s = s - m`) |
 | `CRCT` | `k` | Carrega constante `k` no topo da pilha (`s++; M[s] = k`) |
@@ -237,6 +237,7 @@ A Máquina Hipotética é uma arquitetura de pilha com memória linear de variá
 | `IMPR` | - | Imprime o valor do topo da pilha na saída padrão e desempilha (`print(M[s]); s--`) |
 | `PARA` | - | Encerra a execução do programa na máquina hipotética |
 | `PUSHER`| `p`| *(Suporte a procedimentos)* Empilha endereço de retorno `p` |
+| `PARAM` | `n` | *(Suporte a procedimentos)* Empilha valor de parâmetro do endereço `n` |
 | `CHPR` | `p` | *(Suporte a procedimentos)* Chama procedimento em `p` |
 | `RTPR` | - | *(Suporte a procedimentos)* Retorna do procedimento |
 
@@ -325,9 +326,14 @@ compilador-java/
 │   ├── correto.java.txt         # Código de teste principal de entrada
 │   └── erro_*.java.txt          # Testes de erros léxico, sintático, semântico e divisão por zero
 ├── markdown/
-│   ├── SPECS.md                 # Especificações técnicas do projeto
-│   ├── GUIA_DEFESA_ORAL.md      # Guia preparatório direto para a defesa com o professor
-│   └── GUIA_ESTUDOS_COMPLETO.md # Roteiro didático aprofundado
+│   ├── SPECS.md                        # Especificações técnicas do projeto
+│   ├── GUIA_DEFESA_ORAL.md             # Guia preparatório direto para a defesa com o professor
+│   ├── GUIA_ESTUDOS_COMPLETO.md        # Roteiro didático aprofundado
+│   ├── PERGUNTAS_E_DUVIDAS_CODEBASE.md # Banco de perguntas e respostas sobre o código
+│   ├── lexico.md                       # Documentação do Analisador Léxico
+│   ├── sintatico.md                    # Documentação do Analisador Sintático SLR(1)
+│   ├── semantico.md                    # Documentação do Analisador Semântico
+│   └── maqhipo.md                      # Documentação da Máquina Hipotética
 └── src/compilador/
     ├── MainCompilador.java      # Ponto de entrada do Compilador (Parte 1)
     ├── Lexer.java               # Analisador Léxico puro + Token + Tipo + LexicalException
