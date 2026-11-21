@@ -22,7 +22,7 @@ Lê o código-fonte de entrada, realiza as análises léxica, sintática e semâ
 java -cp bin compilador.MainCompilador exemplos/correto.java.txt
 ```
 
-*Nota: Se executado sem argumentos (`java -cp bin compilador.MainCompilador`), o programa carregará `exemplos/correto.java.txt` por padrão. Para visualizar os conjuntos `FIRST`/`FOLLOW` e os passos detalhados de Shift e Reduce, adicione a flag `--debug`.*
+*Nota: Se executado sem argumentos (`java -cp bin compilador.MainCompilador`), o programa carregará `exemplos/correto.java.txt` por padrão.*
 
 ### 3. Executar a Máquina Hipotética (Parte 2)
 Lê o arquivo `codigo.objeto.txt` gerado e executa as instruções na CPU virtual:
@@ -30,8 +30,6 @@ Lê o arquivo `codigo.objeto.txt` gerado e executa as instruções na CPU virtua
 ```bash
 java -cp bin compilador.maquina.MainMaquina codigo.objeto.txt
 ```
-
-*Nota: Para inspecionar a execução instrução por instrução e o estado da pilha a cada ciclo, adicione a flag `--trace`.*
 
 ---
 
@@ -46,9 +44,9 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
 
 ### 2. Analisador Sintático Ascendente SLR(1) (`ParserSLR.java` e `TabelaSLR.java`)
 - **Implementação:** Analisador sintático ascendente (Shift-Reduce) operando com duas pilhas sincronizadas e tipadas (`pilhaDeEstados` e `pilhaDeNos`) consultando a tabela SLR(1).
-- **Decisão sobre as Tabelas ACTION, GOTO e Conjuntos FIRST/FOLLOW:**
-  - A gramática do trabalho possui 23 não-terminais (24 com `START`), 44 regras de produção e 95 estados canônicos LR(0).
-  - Como a gramática da linguagem é fixa e imutável (`lalg-java.txt`), os conjuntos `FIRST`, `FOLLOW` e todos os estados de transição `ACTION` e `GOTO` (estados `0` a `94`) foram pré-definidos diretamente em ordem numérica dentro de `carregarEstadosSLR()` em `TabelaSLR.java`.
+- **Decisão sobre as Tabelas ACTION, GOTO e Conjuntos FOLLOW:**
+  - A gramática do trabalho possui 23 não-terminais (24 com `START`), 44 regras de produção (`R0` a `R43`) e 95 estados canônicos LR(0) (`0` a `94`).
+  - Como a gramática da linguagem é fixa (`lalg-java.txt`), as 44 regras (`definirGramatica()`), os conjuntos `FOLLOW` (`carregarFollow()`) e todos os estados de transição `ACTION` e `GOTO` (`carregarEstadosSLR()`) foram pré-definidos diretamente em `TabelaSLR.java`.
   - Seguindo a definição formal do SLR(1), o método `adicionarReduce(estadoAtual, numeroDaRegra)` utiliza diretamente o conjunto `FOLLOW(ladoEsquerdo)` do não-terminal à esquerda da regra para preencher as reduções válidas daquele estado.
 - **Ausência de Conflitos:** A gramática fornecida (`lalg-java.txt`) foi formalmente validada e pertence estritamente à classe SLR(1), apresentando 0 conflitos Shift/Reduce e 0 conflitos Reduce/Reduce. O uso explícito de blocos delimitados por chaves `{ ... }` em comandos `if` e `else` elimina o problema clássico de *dangling else*.
 
@@ -74,48 +72,12 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
 
 ---
 
-## Estrutura do Repositório
-
-```text
-compilador-java/
-├── README.md                        # Instruções de compilação e decisões de projeto
-├── lalg-java.txt                    # Gramática original da linguagem
-├── descricao.txt                    # Enunciado oficial do trabalho
-├── codigo.objeto.txt                # Arquivo gerado pelo compilador para a VM
-├── compilador_slr1.excalidraw       # Diagrama visual completo (arquitetura + 95 estados desenhados)
-├── apresentacao_slides.html         # Apresentação interativa de 24 slides com roteiro de fala
-├── slides_compilador_slr1.pdf       # Versão em PDF de alta resolução dos 24 slides
-├── video_explicacao_projeto.mp4     # Vídeo-aula narrada explicando toda a teoria e os 8 arquivos Java
-├── exemplos/                        # Casos de teste válidos e programas com erros
-│   ├── correto.java.txt
-│   ├── erro_lexico.java.txt
-│   ├── erro_sintatico.java.txt
-│   ├── erro_semantico_naodeclarada.java.txt
-│   ├── erro_semantico_duplicada.java.txt
-│   └── erro_divisao_zero.java.txt
-├── markdown/                        # Documentação técnica e roteiro de defesa oral
-│   ├── SPECS.md
-│   ├── GUIA_DEFESA_ORAL.md
-│   ├── GUIA_ESTUDOS_COMPLETO.md
-│   ├── PERGUNTAS_E_DUVIDAS_CODEBASE.md
-│   ├── lexico.md
-│   ├── sintatico.md
-│   ├── semantico.md
-│   └── maqhipo.md
-└── src/compilador/
-    ├── Lexer.java
-    ├── ParserSLR.java
-    ├── TabelaSLR.java
-    ├── AnalisadorSemantico.java
-    ├── TradutorCodigo.java
-    ├── MainCompilador.java
-    └── maquina/
-        ├── MaquinaHipotetica.java
-        └── MainMaquina.java
-```
 
 ---
 
 ## Declaração sobre Uso de Ferramentas de IA
 
-Em cumprimento à exigência do enunciado do trabalho, declara-se que foi utilizado o modelo de linguagem Antigravity (Google DeepMind) como ferramenta de suporte para validação formal de conflitos da gramática, revisão das tabelas da coleção canônica SLR(1) e estruturação do material de documentação técnica.
+Declaro de forma transparente que utilizei o assistente de IA **Google Antigravity** com o modelo **Gemini** ao longo do desenvolvimento deste projeto para:
+
+1. **Implementação e refatoração do código-fonte em Java:** auxílio direto na escrita, organização e simplificação das classes do compilador (`Lexer`, `ParserSLR`, `TabelaSLR`, `AnalisadorSemantico`, `TradutorCodigo`, `MainCompilador`) e do interpretador da Máquina Hipotética (`MaquinaHipotetica`, `MainMaquina`).
+2. **Casos de teste, depuração e documentação:** criação dos programas de teste na pasta `exemplos/`, revisão de comentários no código, elaboração deste `README.md` e estudo detalhado do funcionamento de cada fase.

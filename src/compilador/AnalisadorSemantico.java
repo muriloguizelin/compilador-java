@@ -2,45 +2,29 @@ package compilador;
 
 import java.util.*;
 
-/**
- * FASE 3: ANALISADOR SEMÂNTICO E TABELA DE SÍMBOLOS
- * 
- * O que esta classe faz?
- * Percorre os comandos do programa para garantir duas regras de sentido (semânticas):
- * 1. Nenhuma variável pode ser declarada duas vezes (unicidade).
- * 2. Nenhuma variável pode ser usada sem ter sido declarada antes (declaração prévia).
- * Também numera cada variável com seu endereço de memória (0, 1, 2...) na Tabela de Símbolos.
- */
+// Fase 3: Analisador Semântico — valida declarações de variáveis e monta a Tabela de Símbolos.
 public class AnalisadorSemantico {
 
     public static class Simbolo {
-        public final String nome;
-        public final String tipo;
         public final int endereco; // Posição na memória M[] da Máquina Hipotética (0, 1, 2...)
-        public final int linha, coluna;
+        public final int linha;
 
-        public Simbolo(String nome, String tipo, int endereco, int linha, int coluna) {
-            this.nome = nome;
-            this.tipo = tipo;
+        public Simbolo(int endereco, int linha) {
             this.endereco = endereco;
             this.linha = linha;
-            this.coluna = coluna;
         }
     }
 
     public static class SemanticException extends RuntimeException {
-        public final int linha, coluna;
         public SemanticException(String mensagem, int linha, int coluna) {
             super(String.format("Erro Semantico na linha %d, coluna %d: %s", linha, coluna, mensagem));
-            this.linha = linha;
-            this.coluna = coluna;
         }
     }
 
     public static class TabelaSimbolos {
-        private final Map<String, Simbolo> variaveisDeclaradas = new LinkedHashMap<>();
+        private final Map<String, Simbolo> variaveisDeclaradas = new HashMap<>();
 
-        public Simbolo inserir(Lexer.Token tokenVariavel) {
+        public void inserir(Lexer.Token tokenVariavel) {
             String nome = tokenVariavel.lexema;
             if (variaveisDeclaradas.containsKey(nome)) {
                 Simbolo anterior = variaveisDeclaradas.get(nome);
@@ -48,9 +32,8 @@ public class AnalisadorSemantico {
                         String.format("Variavel '%s' ja declarada anteriormente na linha %d", nome, anterior.linha),
                         tokenVariavel.linha, tokenVariavel.coluna);
             }
-            Simbolo novo = new Simbolo(nome, "double", variaveisDeclaradas.size(), tokenVariavel.linha, tokenVariavel.coluna);
-            variaveisDeclaradas.put(nome, novo);
-            return novo;
+            // System.out.println("Variavel: " + nome + " -> endereco " + variaveisDeclaradas.size());
+            variaveisDeclaradas.put(nome, new Simbolo(variaveisDeclaradas.size(), tokenVariavel.linha));
         }
 
         public void verificarDeclarada(Lexer.Token tokenVariavel) {
@@ -69,20 +52,6 @@ public class AnalisadorSemantico {
         public int getTotalVariaveis() {
             return variaveisDeclaradas.size();
         }
-
-        public void imprimirTabela() {
-            System.out.println("--------------------------------------------------------------------------");
-            System.out.println("                        TABELA DE SIMBOLOS                                ");
-            System.out.println("--------------------------------------------------------------------------");
-            System.out.printf("%-5s | %-13s | %-8s | %-10s | %-12s%n", "#", "Identificador", "Tipo", "Endereco", "Posicao");
-            System.out.println("------+---------------+----------+------------+-------------");
-            int ordem = 1;
-            for (Simbolo s : variaveisDeclaradas.values()) {
-                System.out.printf("%-5d | %-13s | %-8s | %-10d | %d:%d%n",
-                        ordem++, s.nome, s.tipo, s.endereco, s.linha, s.coluna);
-            }
-            System.out.println("--------------------------------------------------------------------------");
-        }
     }
 
     private final TabelaSimbolos tabela = new TabelaSimbolos();
@@ -93,11 +62,7 @@ public class AnalisadorSemantico {
         return tabela;
     }
 
-    /**
-     * Percorre a árvore de comandos na ordem do código:
-     * - Se encontrar um nó VAR ("double a, b;"), cadastra todas as variáveis declaradas nele.
-     * - Se encontrar qualquer outro token ID no meio dos comandos, verifica se já foi declarado!
-     */
+    // Percorre os comandos: se for nó VAR cadastra as variáveis; se for ID verifica se foi declarada.
     private void percorrerComandos(ParserSLR.NoSintatico no) {
         // 1. Declaração de variáveis (VAR -> TIPO VARS)
         if (no.naoTerminal == ParserSLR.NaoTerminal.VAR) {
@@ -116,9 +81,7 @@ public class AnalisadorSemantico {
         }
     }
 
-    /**
-     * Cadastra na Tabela de Símbolos todos os nomes de variáveis (tokens ID) dentro de um bloco VAR.
-     */
+    // Cadastra na Tabela de Símbolos todos os nomes de variáveis (ID) dentro de um bloco VAR.
     private void cadastrarVariaveis(ParserSLR.NoSintatico no) {
         if (no.getTipoToken() == Lexer.Tipo.ID) {
             tabela.inserir(no.token);

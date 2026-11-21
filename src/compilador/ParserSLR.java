@@ -2,18 +2,9 @@ package compilador;
 
 import java.util.*;
 
-/**
- * FASE 2: ANALISADOR SINTÁTICO ASCENDENTE SLR(1) (Shift-Reduce)
- * 
- * O que esta classe faz?
- * Recebe a lista de Tokens gerada pelo Lexer, verifica se a ordem segue a gramática
- * consultando a TabelaSLR e monta de baixo para cima a Árvore Sintática do programa.
- */
+// Fase 2: Analisador Sintático Ascendente SLR(1) (Shift-Reduce).
 public class ParserSLR {
 
-    /**
-     * Símbolos Não-Terminais da gramática (representam os blocos/estruturas da linguagem).
-     */
     public enum NaoTerminal {
         START,          // Símbolo inicial da gramática aumentada (START -> PROG)
         PROG,           // Programa completo (public class ... { public static void main ... })
@@ -41,9 +32,7 @@ public class ParserSLR {
         OP_MUL          // Operador de Multiplicação (*) ou Divisão (/)
     }
 
-    /**
-     * Nó da Árvore Sintática: pode ser uma Folha (guarda um Token) ou um Nó Interno (guarda um NaoTerminal e filhos).
-     */
+    // Nó da árvore sintática: Folha (guarda Token) ou Nó Interno (guarda NaoTerminal e filhos).
     public static class NoSintatico {
         public final NaoTerminal naoTerminal;
         public final Lexer.Token token;
@@ -52,73 +41,44 @@ public class ParserSLR {
         public NoSintatico(NaoTerminal naoTerminal) { this.naoTerminal = naoTerminal; this.token = null; }
         public NoSintatico(Lexer.Token token)       { this.naoTerminal = null; this.token = token; }
 
-        public boolean ehFolha()             { return token != null; }
         public Lexer.Tipo getTipoToken()     { return token != null ? token.tipo : null; }
-        public String getLexema()            { return token != null ? token.lexema : ""; }
-        public NoSintatico getFilho(int i)   { return (i >= 0 && i < filhos.size()) ? filhos.get(i) : null; }
+        public String getLexema()            { return token.lexema; }
+        public NoSintatico getFilho(int i)   { return filhos.get(i); }
         public int getQtdFilhos()            { return filhos.size(); }
     }
 
     public static class SyntacticException extends RuntimeException {
-        public final int linha, coluna;
         public SyntacticException(String mensagem, int linha, int coluna) {
             super(String.format("Erro Sintatico na linha %d, coluna %d: %s", linha, coluna, mensagem));
-            this.linha = linha;
-            this.coluna = coluna;
-        }
-    }
-
-    public static class ResultadoParser {
-        public final NoSintatico raiz;
-        public final int passos, shifts, reduces;
-        public ResultadoParser(NoSintatico raiz, int passos, int shifts, int reduces) {
-            this.raiz = raiz;
-            this.passos = passos;
-            this.shifts = shifts;
-            this.reduces = reduces;
         }
     }
 
     private final TabelaSLR tabela = new TabelaSLR();
-    private boolean modoDebug = false;
 
-    public void setModoDepuracao(boolean debug) { this.modoDebug = debug; }
-
-    /**
-     * Executa o autômato com pilha SLR(1) (Shift-Reduce).
-     */
-    public ResultadoParser analisar(List<Lexer.Token> tokens) {
-        if (modoDebug) tabela.imprimirFirstFollow();
-
+    // Executa o algoritmo SLR(1) (Shift-Reduce) e retorna a raiz (PROG) da árvore.
+    public NoSintatico analisar(List<Lexer.Token> tokens) {
         Deque<Integer> pilhaDeEstados = new ArrayDeque<>();
         Deque<NoSintatico> pilhaDeNos = new ArrayDeque<>();
         pilhaDeEstados.push(0); // Começa no Estado 0
 
-        int indiceTokenAtual = 0, passos = 0, totalShifts = 0, totalReduces = 0;
+        int indiceTokenAtual = 0;
 
         while (true) {
-            passos++;
             int estadoAtual = pilhaDeEstados.peek();
             Lexer.Token tokenAtual = tokens.get(indiceTokenAtual);
             TabelaSLR.Acao acao = tabela.obterAcao(estadoAtual, tokenAtual.tipo);
-
-            if (modoDebug) {
-                System.out.printf("Passo %-4d | Estado %-3d | Token %-15s | Acao: %s%n",
-                        passos, estadoAtual, tokenAtual.lexema, acao.tipo);
-            }
+            // System.out.println("Estado: " + estadoAtual + " | Token: " + tokenAtual.tipo + " | Acao: " + acao.tipo);
 
             switch (acao.tipo) {
                 case SHIFT:
-                    // Empilha o token lido, avança para o novo estado e passa para o próximo token
-                    totalShifts++;
+                    // Empilha o token lido, empilha o novo estado e avança para o próximo token
                     pilhaDeNos.push(new NoSintatico(tokenAtual));
                     pilhaDeEstados.push(acao.estadoDestino);
                     indiceTokenAtual++;
                     break;
 
                 case REDUCE:
-                    // Agrupa os filhos do ladoDireito da regra dentro de um novo nó (ladoEsquerdo)
-                    totalReduces++;
+                    // Desempilha os k filhos da regra, agrupa dentro do novoNoPai e consulta o GOTO
                     TabelaSLR.Regra regra = acao.regraParaReduzir;
                     NoSintatico novoNoPai = new NoSintatico(regra.ladoEsquerdo);
 
@@ -134,7 +94,7 @@ public class ParserSLR {
 
                 case ACCEPT:
                     // Fim do arquivo ($) atingido no Estado 2: retorna a raiz PROG da árvore!
-                    return new ResultadoParser(pilhaDeNos.pop(), passos, totalShifts, totalReduces);
+                    return pilhaDeNos.pop();
 
                 case ERROR:
                 default:

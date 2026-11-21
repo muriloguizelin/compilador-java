@@ -6,18 +6,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
-/**
- * FASE 1: ANALISADOR LÉXICO (Lexer)
- * 
- * O que esta classe faz?
- * Lê o texto do código-fonte caractere por caractere e agrupa esses caracteres
- * em "Tokens" (palavras reservadas, variáveis, números e símbolos), ignorando espaços e comentários.
- */
+// Fase 1: Analisador Léxico — lê o código-fonte e agrupa os caracteres em Tokens, ignorando espaços e comentários.
 public class Lexer {
 
-    /**
-     * Todos os tipos de Tokens reconhecidos pela gramática da linguagem (lalg-java).
-     */
+    // Todos os tipos de Tokens (terminais) reconhecidos pela gramática lalg-java.
     public enum Tipo {
         // Palavras reservadas da linguagem
         PUBLIC, CLASS, STATIC, VOID, MAIN, STRING, DOUBLE, IF, ELSE, WHILE,
@@ -41,9 +33,7 @@ public class Lexer {
         EOF
     }
 
-    /**
-     * Representa um Token encontrado no código-fonte.
-     */
+    // Representa um Token encontrado no código-fonte.
     public static class Token {
         public final Tipo tipo;
         public final String lexema; // Texto original lido do código (ex: "while", "cont", "10")
@@ -56,23 +46,12 @@ public class Lexer {
             this.linha = linha;
             this.coluna = coluna;
         }
-
-        @Override
-        public String toString() {
-            return String.format("<%s, '%s', %d:%d>", tipo, lexema, linha, coluna);
-        }
     }
 
-    /**
-     * Erro disparado quando o Analisador Léxico encontra um caractere inválido ou comentário aberto.
-     */
+    // Erro disparado quando o Analisador Léxico encontra caractere inválido ou comentário aberto.
     public static class LexicalException extends RuntimeException {
-        public final int linha, coluna;
-
         public LexicalException(String mensagem, int linha, int coluna) {
             super(String.format("Erro Lexico na linha %d, coluna %d: %s", linha, coluna, mensagem));
-            this.linha = linha;
-            this.coluna = coluna;
         }
     }
 
@@ -103,9 +82,7 @@ public class Lexer {
         return new Lexer(Files.readString(Path.of(caminhoArquivo), StandardCharsets.UTF_8));
     }
 
-    /**
-     * Percorre todo o código-fonte do início ao fim e retorna a lista completa de Tokens.
-     */
+    // Percorre todo o código-fonte do início ao fim e retorna a lista completa de Tokens.
     public List<Token> tokenizarTodos() {
         List<Token> listaDeTokens = new ArrayList<>();
         Token token;
@@ -116,9 +93,7 @@ public class Lexer {
         return listaDeTokens;
     }
 
-    /**
-     * Lê e retorna o próximo Token válido do código-fonte.
-     */
+    // Lê e retorna o próximo Token válido do código-fonte.
     public Token proximoToken() {
         pularEspacosEComentarios();
 
@@ -217,9 +192,7 @@ public class Lexer {
         return true;
     }
 
-    /**
-     * Ignora espaços em branco, quebras de linha e comentários (// ou /* ... * /).
-     */
+    // Ignora espaços em branco, quebras de linha e comentários (// ou /* ... */).
     private void pularEspacosEComentarios() {
         while (posicaoAtual < codigoFonte.length()) {
             // 1. Espaços, tabulações e quebras de linha

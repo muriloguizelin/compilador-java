@@ -5,13 +5,7 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * FASE 4: TRADUTOR E GERADOR DE CÓDIGO OBJETO
- * 
- * O que esta classe faz?
- * Percorre a Árvore Sintática e traduz cada comando Java para instruções da Máquina Hipotética
- * (INPP, ALME, CRCT, CRVL, SOMA, DSVF, PARA, etc.), salvando no arquivo "codigo.objeto.txt".
- */
+// Fase 4: Tradutor e Gerador de Código Objeto — percorre a árvore e gera "codigo.objeto.txt".
 public class TradutorCodigo {
 
     public static class Instrucao {
@@ -38,11 +32,8 @@ public class TradutorCodigo {
         this.tabelaSimbolos = tabelaSimbolos;
     }
 
-    public List<Instrucao> getInstrucoes() { return listaInstrucoes; }
-
-    public int emitir(String operacao) {
+    public void emitir(String operacao) {
         listaInstrucoes.add(new Instrucao(operacao, null));
-        return listaInstrucoes.size() - 1;
     }
 
     public int emitir(String operacao, double argumento) {
@@ -67,9 +58,7 @@ public class TradutorCodigo {
         emitir("PARA"); // PARA = Parar a execução da máquina
     }
 
-    /**
-     * Percorre um bloco da árvore procurando comandos simples (CMD) e condicionais/laços (CMD_COND).
-     */
+    // Percorre a árvore procurando comandos simples (CMD) e condicionais/laços (CMD_COND).
     private void traduzirBlocoComandos(ParserSLR.NoSintatico no) {
         if (no.naoTerminal == ParserSLR.NaoTerminal.CMD) {
             traduzirComandoSimples(no);
@@ -85,9 +74,7 @@ public class TradutorCodigo {
         }
     }
 
-    /**
-     * Traduz um comando simples (CMD): System.out.println ou atribuição "id = ...".
-     */
+    // Traduz um comando simples (CMD): System.out.println ou atribuição "id = ...".
     private void traduzirComandoSimples(ParserSLR.NoSintatico noCmd) {
         // 1. Impressão: CMD -> System.out.println ( EXPRESSAO )
         if (noCmd.getFilho(0).getTipoToken() == Lexer.Tipo.PRINT) {
@@ -98,7 +85,9 @@ public class TradutorCodigo {
 
         // 2. Atribuição: CMD -> id RESTO_IDENT (onde RESTO_IDENT -> = EXP_IDENT)
         int enderecoVar = tabelaSimbolos.obterEndereco(noCmd.getFilho(0).getLexema());
-        ParserSLR.NoSintatico valorAtribuido = noCmd.getFilho(1).getFilho(1).getFilho(0);
+        ParserSLR.NoSintatico noRestoIdent = noCmd.getFilho(1);      // RESTO_IDENT -> = EXP_IDENT
+        ParserSLR.NoSintatico noExpIdent = noRestoIdent.getFilho(1); // EXP_IDENT -> lerDouble() | EXPRESSAO
+        ParserSLR.NoSintatico valorAtribuido = noExpIdent.getFilho(0);
 
         if (valorAtribuido.getTipoToken() == Lexer.Tipo.LER_DOUBLE) {
             emitir("LEIT"); // LEIT = Lê número do teclado e empilha
@@ -108,9 +97,7 @@ public class TradutorCodigo {
         emitir("ARMZ", enderecoVar); // ARMZ = Armazena o topo da pilha na variável
     }
 
-    /**
-     * Traduz estruturas de decisão (if / else) e repetição (while).
-     */
+    // Traduz estruturas de decisão (if / else) e repetição (while).
     private void traduzirComandoCondicionalOuLoop(ParserSLR.NoSintatico noCmdCond) {
         Lexer.Tipo tipo = noCmdCond.getFilho(0).getTipoToken();
         ParserSLR.NoSintatico noCondicao = noCmdCond.getFilho(2);
@@ -132,7 +119,7 @@ public class TradutorCodigo {
                 corrigirDesvio(linhaDsvf, listaInstrucoes.size());
             }
 
-        } else if (tipo == Lexer.Tipo.WHILE) {
+        } else {
             // CMD_COND -> while ( CONDICAO ) { CMDS }
             int linhaInicioWhile = listaInstrucoes.size();
             traduzirCondicao(noCondicao);
@@ -148,7 +135,8 @@ public class TradutorCodigo {
         traduzirExpressao(noCondicao.getFilho(0));
         traduzirExpressao(noCondicao.getFilho(2));
 
-        switch (noCondicao.getFilho(1).getFilho(0).getTipoToken()) {
+        ParserSLR.NoSintatico noRelacao = noCondicao.getFilho(1); // RELACAO -> == | != | >= | <= | > | <
+        switch (noRelacao.getFilho(0).getTipoToken()) {
             case EQ: emitir("CPIG"); break; // == (Comparar Igual)
             case NE: emitir("CDES"); break; // != (Comparar Desigualdade)
             case GE: emitir("CMAI"); break; // >= (Comparar Maior ou Igual)
@@ -170,7 +158,8 @@ public class TradutorCodigo {
         if (noOutros.getQtdFilhos() == 0) return;
         traduzirTermo(noOutros.getFilho(1));
 
-        Lexer.Tipo op = noOutros.getFilho(0).getFilho(0).getTipoToken();
+        ParserSLR.NoSintatico noOpAd = noOutros.getFilho(0); // OP_AD -> + | -
+        Lexer.Tipo op = noOpAd.getFilho(0).getTipoToken();
         emitir(op == Lexer.Tipo.MAIS ? "SOMA" : "SUBT");
         traduzirOutrosTermos(noOutros.getFilho(2));
     }
@@ -191,7 +180,8 @@ public class TradutorCodigo {
         if (noMaisFatores.getQtdFilhos() == 0) return;
         traduzirFator(noMaisFatores.getFilho(1));
 
-        Lexer.Tipo op = noMaisFatores.getFilho(0).getFilho(0).getTipoToken();
+        ParserSLR.NoSintatico noOpMul = noMaisFatores.getFilho(0); // OP_MUL -> * | /
+        Lexer.Tipo op = noOpMul.getFilho(0).getTipoToken();
         emitir(op == Lexer.Tipo.MULT ? "MULT" : "DIVI");
         traduzirMaisFatores(noMaisFatores.getFilho(2));
     }
@@ -212,15 +202,5 @@ public class TradutorCodigo {
         try (PrintWriter pw = new PrintWriter(caminhoArquivo, StandardCharsets.UTF_8)) {
             for (Instrucao i : listaInstrucoes) pw.println(i);
         }
-    }
-
-    public void imprimirCodigo() {
-        System.out.println("--------------------------------------------------------------------------");
-        System.out.println("                 CODIGO OBJETO GERADO (MAQUINA HIPOTETICA)                ");
-        System.out.println("--------------------------------------------------------------------------");
-        for (int k = 0; k < listaInstrucoes.size(); k++) {
-            System.out.printf("%-4d: %s%n", k, listaInstrucoes.get(k));
-        }
-        System.out.println("--------------------------------------------------------------------------");
     }
 }
