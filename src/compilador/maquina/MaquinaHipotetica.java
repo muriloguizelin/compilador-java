@@ -34,13 +34,6 @@ public class MaquinaHipotetica {
 
     private final Scanner leitorTeclado = new Scanner(System.in);
 
-    private void verificarLimitePilha(int posicoes) {
-        if (s + posicoes >= M.length) {
-            throw new IllegalStateException(
-                    "Estouro da pilha de memoria (limite de " + M.length + " posicoes)");
-        }
-    }
-
     // Lê o arquivo de texto (ex: "codigo.objeto.txt") e transforma cada linha em uma InstrucaoVM.
     public void carregarArquivo(String caminhoArquivo) throws IOException {
         List<String> linhasDoArquivo = Files.readAllLines(Path.of(caminhoArquivo), StandardCharsets.UTF_8);
@@ -78,7 +71,6 @@ public class MaquinaHipotetica {
 
                 case "ALME": // Alocar Memória: avança 's' para reservar espaço para as variáveis declaradas
                     int qtdAlocar = instrucao.argumento.intValue();
-                    verificarLimitePilha(qtdAlocar);
                     s = s + qtdAlocar;
                     break;
 
@@ -94,13 +86,11 @@ public class MaquinaHipotetica {
                 // 2. Movimentação de dados (empilhar e salvar variáveis)
 
                 case "CRCT": // Carregar Constante: coloca um número literal (ex: 10) no topo da pilha
-                    verificarLimitePilha(1);
                     s = s + 1;
                     M[s] = instrucao.argumento;
                     break;
 
                 case "CRVL": // Carregar Valor: busca o valor de uma variável na memória e coloca no topo da pilha
-                    verificarLimitePilha(1);
                     int enderecoOrigem = instrucao.argumento.intValue();
                     s = s + 1;
                     M[s] = M[enderecoOrigem];
@@ -191,7 +181,6 @@ public class MaquinaHipotetica {
                 // 6. Entrada (leitura do teclado) e saída (impressão na tela)
 
                 case "LEIT": // Leitura: pede um número no terminal e empilha no topo de M[]
-                    verificarLimitePilha(1);
                     System.out.print("[LEITURA] Digite um numero (double): ");
                     s = s + 1;
                     M[s] = Double.parseDouble(leitorTeclado.next().replace(',', '.'));

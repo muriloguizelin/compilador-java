@@ -12,8 +12,6 @@ public class Teste {
                 c = b - a;
             }
             System.out.println(c);
-                        System.out.println(c);
-
             cont = cont - 1;
         }
         System.out.println(c);

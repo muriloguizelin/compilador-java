@@ -51,8 +51,8 @@ public class TradutorCodigo {
         int totalVars = tabelaSimbolos.getTotalVariaveis();
         if (totalVars > 0) emitir("ALME", totalVars); // ALME = Alocar Memória para as variáveis
 
-        // Percorre e traduz todos os comandos do programa
-        traduzirBlocoComandos(noRaizProg);
+        // O filho 15 de PROG é o bloco <CMDS> dentro do método main
+        traduzirBlocoComandos(noRaizProg.getFilho(15));
 
         if (totalVars > 0) emitir("DESM", totalVars); // DESM = Desalocar Memória
         emitir("PARA"); // PARA = Parar a execução da máquina

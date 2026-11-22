@@ -72,9 +72,6 @@ O projeto é estruturado em duas etapas independentes conectadas pelo arquivo de
 
 ---
 
-
----
-
 ## Declaração sobre Uso de Ferramentas de IA
 
 Declaro de forma transparente que utilizei o assistente de IA **Google Antigravity** com o modelo **Gemini** ao longo do desenvolvimento deste projeto para:
